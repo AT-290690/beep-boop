@@ -1,0 +1,2 @@
+/ -> :::res.sendFile(:::__dirname + "/public/index.html")
+/about -> :::res.status(200).json({ data: "This site is about music!" })
