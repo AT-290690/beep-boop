@@ -34,7 +34,7 @@ middlewares ->
 
 	static -> 
 		{ express, __dirname, app } := ::
-		app.use(express.static("server/dist/public"))
+		app.use(express.static("app/dist/public"))
 		#("serviceErrorHandler", { app })
 		<- { app }
 	
