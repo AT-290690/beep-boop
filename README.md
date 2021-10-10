@@ -5,7 +5,7 @@ PRIVATE_KEY = secret
 TOKEN_LIFETIME = 360000   
 DB = mongodb+srv:://####################    
 ```
- < ./app/index.go >
+  < ./app/index.go >
  
  - 0 > modules
  - 1 >  connection
@@ -27,6 +27,8 @@ DB = mongodb+srv:://####################
  < ./app/errors.go >
  
  - 0 > serviceErrorHandler
+ - 1 >  development
+ - 1 >  production
  - 0 > sendError
   
  < ./app/home.go >
