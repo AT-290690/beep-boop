@@ -1,4 +1,4 @@
-export const quiverObject = `export class Quiver {
+export class Quiver {
   memo = {};
   func = {};
   nodes = {};
@@ -26,7 +26,7 @@ export const quiverObject = `export class Quiver {
     ) {
       if (this.logOn) {
         this.output.push({ result, at: node.key, from: node.prev });
-      } 
+      }
       return result;
     } else {
       for (const n of node.next) {
@@ -56,7 +56,7 @@ export const quiverObject = `export class Quiver {
   }
 
   out() {
-    if(!this.logOn) return 'Log is turned off!'
+    if (!this.logOn) return 'Log is turned off!';
     return this.output;
   }
 
@@ -86,4 +86,4 @@ export const quiverObject = `export class Quiver {
   ifNotVisited(key, callback) {
     return key in this.visited ? undefined : callback();
   }
-}`;
+}

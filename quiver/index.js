@@ -1,6 +1,5 @@
 import * as fs from 'fs';
-const { mkdir, writeFile, readdir, access } = fs.promises;
-import { quiverObject } from './class.js';
+const { readdir } = fs.promises;
 import { compile } from './compiler.js';
 
 export const quiver = async ({ dir, root, indentBy }) => {
@@ -19,9 +18,4 @@ export const quiver = async ({ dir, root, indentBy }) => {
   for (const file of files) {
     await compile(dir ? './' + dir + '/' + file : './' + file, merge, indentBy);
   }
-  const libDir = `./${dir}/dist/qvr/`;
-  await access(`${libDir}qvr.js`).catch(async () => {
-    await mkdir(libDir, { recursive: true });
-    await writeFile(`${libDir}qvr.js`, quiverObject);
-  });
 };

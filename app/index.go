@@ -5,7 +5,6 @@ modules ->
 		dotevn: await import("dotenv"),
 		bcrypt: (await import("bcrypt")).default
 	}
-
 	miscs := {
 		URL: await import("url"),
 		path: await import("path"),
@@ -51,6 +50,7 @@ modules ->
 			error.status = 404
 			next(error)
 		})
+
 		<- { app }
 
 		listen -> 
@@ -72,8 +72,3 @@ modules ->
 				}
 			})
 			<- "Starting server!"
-
-	
-		
-		
-		

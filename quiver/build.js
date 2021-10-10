@@ -1,9 +1,7 @@
 import {
-  logBoldMessage,
   logErrorMessage,
   logSuccessMessage,
   logWarningMessage,
-  logErrorIndentationLevel,
   logErrorAlreadyExists
 } from './logg.js';
 import * as fs from 'fs';
@@ -21,8 +19,7 @@ export const build = async (main, graph) => {
       node => node.type === 'root'
     ).key;
     logWarningMessage(`\n< [${root}] ${settings.files.join(' -> ')} >\n`);
-    const buildCode = `${settings.quiverModule}
-const qvr = new Quiver();
+    const buildCode = `const qvr = new Quiver();
 qvr.setNodes(${JSON.stringify(
       monolithNodes.reduce((acc, item) => ({ ...acc, ...item }), {})
     )});
@@ -52,7 +49,9 @@ return qvr.out();
     await mkdir(`./${dir}/dist`, { recursive: true });
     await writeFile(
       `./${dir}/dist/${settings.files[0].split('.go')[0]}.js`,
-      buildCode
+      `import { Quiver } from '${path
+        .map(() => '../')
+        .join('')}quiver/quiver.js';\n` + buildCode
     );
     logSuccessMessage(`${settings.files[0].split('.go')[0]}.js is generated!`);
     errors.count

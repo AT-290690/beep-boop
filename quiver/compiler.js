@@ -7,8 +7,7 @@ export const settings = {
   file: '',
   files: [],
   indentBy: '\t',
-  quiverModule: `import { Quiver } from './qvr/qvr.js'`,
-  languageUnaryTokens: {
+  unaryTokens: {
     '<- ': 'return ',
     '#': 'qvr.goTo',
     '!#': 'qvr.visit',
@@ -17,7 +16,8 @@ export const settings = {
     'k::': '__key',
     'p::': '__prev',
     'n::': '__next',
-    '@:': 'qvr.memo.'
+    '@:': 'qvr.memo.',
+    'nodes::': 'qvr.nodes'
   }
 };
 const parse = (source, tokens) => {
@@ -42,16 +42,14 @@ const compileToJs = async () => {
     if (lambda.length === 2) {
       const key = lambda[0].trim();
       createTreeMap(treeMap, lambda[0]);
-      const expression = parse(lambda[1]?.trim(), settings.languageUnaryTokens);
+      const expression = parse(lambda[1]?.trim(), settings.unaryTokens);
       const body = expression ? 'return ' + expression : '';
       let startBrace = index !== 0 ? '}\n' : '';
       compiledCode += `${startBrace}qvr.func["${key}"] = async (__value, __key, __prev, __next) => {\n${
         body ? body + '\n' : ''
       }`;
     } else {
-      const body = parse(lambda[0]?.trim(), settings.languageUnaryTokens)
-        // .replace(/<- /g, 'return ')
-        .split(':=');
+      const body = parse(lambda[0]?.trim(), settings.unaryTokens).split(':=');
       if (body?.length > 1) {
         body[0] = 'const ' + body[0] + '=';
       }
