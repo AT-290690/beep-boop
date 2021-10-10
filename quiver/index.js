@@ -17,7 +17,7 @@ export const quiver = async ({ dir, root, indentBy }) => {
   const merge = monolithic ? files : [];
 
   for (const file of files) {
-    await compile(dir + file, merge, indentBy);
+    await compile(dir ? './' + dir + '/' + file : './' + file, merge, indentBy);
   }
   const libDir = `./${dir}/dist/qvr/`;
   await access(`${libDir}qvr.js`).catch(async () => {

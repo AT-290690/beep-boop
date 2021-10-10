@@ -45,7 +45,9 @@ export const traverse = tree => {
   const values = Object.values(tree);
   values.forEach(current => {
     const parent = backTrack(current, tree[current.prev], tree);
-    if (parent) {
+    if (!parent) {
+      current.prev = null;
+    } else if (parent) {
       parent.next.push(current.key);
       current.prev = parent.key;
       if (current.next.length === 0) {

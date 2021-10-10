@@ -14,7 +14,9 @@ router ->
 		(path ? app.use(path, route) : true) && 
 		((method, endpoint) => 
 		route[method.toLowerCase()]
-		(endpoint, access === "public" ? (req, res, next) => next() : @:authenticate , (req, res, next) => catchErrors(#(method + req.url.split('?')[0], { req, res, next }))) &&
+		(endpoint, access === "public" ? 
+		(req, res, next) => next() : 
+		@:authenticate , (req, res, next) => catchErrors(#(method + req.url.split('?')[0], { req, res, next }))) &&
 		listen(null, access, route))
 		<- { app , listen, __dirname }
 

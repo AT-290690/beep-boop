@@ -4,8 +4,8 @@
   "description": "",
   "main": "quiver.js",
   "scripts": {
-    "start": "node ./app/index.js",
-    "qvr": "node server.js"
+    "start": "node ./app/main.js",
+    "qvr": "node quiver.settings.js"
   },
   "type": "module",
   "author": "",

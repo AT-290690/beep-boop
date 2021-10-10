@@ -8,12 +8,11 @@ for (let i = 0; i < 7; i++) sounds.push(document.getElementById(`switch${i}`));
 const playSound = index => {
   const sound = sounds[index];
   if (sound) {
-    sound.volume = 0.5;
+    sound.volume = 0.1;
     sound.currentTime = 0;
     sound.play();
   }
 };
-
 const loginMessage = 'You are logged!';
 const AllNotes = [
   'A0',
@@ -65,7 +64,7 @@ const AllNotes = [
   'B7',
   'B8'
 ];
-
+const getNoteId = note => `${note.x}:${note.y}`;
 const AuthContext = createContext();
 const LoginScreen = () => {
   const { sessionAuth, setSessionAuth } = useContext(AuthContext);
@@ -167,20 +166,17 @@ const intToRGB = i => {
 
 const Note = ({ i, j, note, sound, sheet, mod }) => {
   const id = `${i}:${j}`;
-  const incoming = sheet[id];
-  const incomingData = incoming ? incoming : [];
-  const [delay, setDelay] = useState(
-    incoming ? +incomingData[1] : +sheet[id]?.[1] || 0.1
-  );
+  const imported = sheet[id] || null;
+  const [delay, setDelay] = useState(imported ? imported.delay : 0.1);
   const [size, setSize] = useState(
-    incoming && +incomingData[1] > 0.1 ? +incomingData[1] * 2 + 1 : 1
+    imported && imported.delay > 0.1 ? imported.delay * 2 + 1 : 1
   );
-  const [opacity, setOpacity] = useState(incoming ? '1' : '0.1');
-  const [color] = useState('#' + intToRGB(hashCode(note + '123')));
+  const [opacity, setOpacity] = useState(imported ? '1' : '0.1');
+  const [color] = useState('#' + intToRGB(hashCode(note + '1230')));
 
-  // const [focus, setFocus] = useState(!!incoming);
-  if (incoming) {
-    sheet[id] = [note, delay, i, j];
+  // const [focus, setFocus] = useState(!!imported);
+  if (imported) {
+    sheet[id] = { value: note, delay: delay, x: i, y: j };
   }
   return (
     <div className="note">
@@ -210,7 +206,7 @@ const Note = ({ i, j, note, sound, sheet, mod }) => {
           } else {
             setOpacity('1');
             sound.triggerAttackRelease(note, delay);
-            sheet[id] = [note, delay, i, j];
+            sheet[id] = { value: note, delay: delay, x: i, y: j };
           }
         }}
       >
@@ -257,7 +253,6 @@ const Matrix = () => {
   const [sheet, setSheet] = useState({});
   const [reload, setReload] = useState(true);
   const [load, setLoad] = useState(false);
-  const [toolbarIsOpen, setToolBarIsOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [isMusicListOpen, setIsMusicListOpen] = useState(false);
   const [musicList, setMusicList] = useState([]);
@@ -299,7 +294,7 @@ const Matrix = () => {
 
   const calibrateNotes = () => {
     Object.values(sheet).forEach(
-      note => (sheet[`${note[2]}:${note[3]}`][0] = Notes[note[3]])
+      note => (sheet[getNoteId(note)].value = Notes[note.y])
     );
   };
 
@@ -351,16 +346,15 @@ const Matrix = () => {
         //   prev[2] * 10 + prev[3] >= next[2] * 10 + next[3] ? -1 : 1
         // )
         .map(note => {
-          const element = elementsMap.get(
-            `${(note[2] + pagination) % mod}:${note[3]}`
-          );
+          const { x, y } = note;
+          const element = elementsMap.get(`${(x + pagination) % mod}:${y}`);
 
           if (element) {
             element.style.opacity = '0.1';
             element.firstChild.style.transform = `scale(1)`;
           }
-          localMax = Math.max(localMax, note[2]);
-          return { note, element, index: note[2] };
+          localMax = Math.max(localMax, x);
+          return { note, element, index: x };
         });
 
       for (let i = 0; i < localMax; i++) {
@@ -372,10 +366,11 @@ const Matrix = () => {
       sheetArr.map(({ note, element, index }) =>
         setTimeout(() => {
           if (note) {
-            sound.triggerAttackRelease(note[0], note[1]);
+            const { value, delay } = note;
+            sound.triggerAttackRelease(value, delay);
             element.style.opacity = '1';
             element.firstChild.style.transform = `scale(${
-              +note[1] > 0.1 ? +note[1] * 2 + 1 : 1
+              delay > 0.1 ? delay * 2 + 1.5 : 1.5
             })`;
             setTimeout(() => {
               element.style.opacity = '0.1';
@@ -409,109 +404,63 @@ const Matrix = () => {
   return (
     <div>
       <div>
-        {toolbarIsOpen ? (
-          <div className="menu">
-            <span
-              className="ui icon"
-              style={{
-                color: 'springgreen',
-                fontSize: '50px',
-                margin: '0 10px'
-              }}
-            >
-              ♯
-            </span>
-            <input
-              className="ui"
-              onChange={e => {
-                setOffset(+e.currentTarget.value);
-                offsetNotes(e);
-              }}
-              value={offset}
-              type="number"
-              min="0"
-              max={AllNotes.length}
-              style={{
-                width: '50px',
-                textAlign: 'center',
-                fontSize: '20px',
-                border: 'solid 2px springgreen',
-                color: 'springgreen'
-              }}
-            />
-            <span
-              className="ui icon"
-              style={{
-                color: 'cornflowerblue',
-                fontSize: '55px',
-                margin: '0 15px'
-              }}
-              onClick={() => setIsMusicListOpen(!isMusicListOpen)}
-            >
-              ◆
-            </span>
-            <input
-              className="ui"
-              style={{
-                border: 'solid 2px',
-                color: 'cornflowerblue',
-                maxWidth: 100
-              }}
-              onKeyPress={e =>
-                e.key === 'Enter' &&
-                populateMusicList({
-                  username: e.currentTarget.value || sessionAuth.data.username,
-                  page: Math.floor(speed),
-                  perPage: 10
-                })
-              }
-            />
-            <span
-              className="ui icon"
-              style={{ color: 'yellow', fontSize: '55px', margin: '0 15px' }}
-            >
-              ⧗
-            </span>
-            <input
-              className="ui"
-              onChange={e => setSpeed(+e.currentTarget.value)}
-              step="0.1"
-              type="number"
-              style={{
-                width: 80,
-                fontSize: 20,
-                textAlign: 'center',
-                border: 'solid 2px',
-                color: 'yellow'
-              }}
-              value={speed}
-            />
-          </div>
-        ) : null}
-      </div>
-      <div className="tools">
-        {!toolbarIsOpen ? (
-          <button
+        <div className="menu">
+          <input
             className="ui"
+            onChange={e => {
+              setOffset(+e.currentTarget.value);
+              offsetNotes(e);
+            }}
+            value={offset}
+            type="number"
+            min="0"
+            max={AllNotes.length}
             style={{
-              color: 'orchid'
+              width: '50px',
+              textAlign: 'center',
+              fontSize: '20px',
+              border: 'solid 2px springgreen',
+              color: 'springgreen'
+            }}
+          />
+          <span
+            className="ui icon"
+            style={{
+              color: 'cornflowerblue',
+              fontSize: '55px',
+              margin: '0 15px'
             }}
             onClick={() => {
-              setToolBarIsOpen(true);
-              playSound(5);
+              if (musicList.length) {
+                setIsMusicListOpen(!isMusicListOpen);
+              } else {
+                populateMusicList({
+                  username: sessionAuth.data.username,
+                  page: Math.floor(speed),
+                  perPage: 10
+                });
+              }
             }}
           >
-            +
-          </button>
-        ) : (
-          <button
+            ◆
+          </span>
+          <input
             className="ui"
-            onClick={() => setToolBarIsOpen(false)}
-            style={{ color: 'crimson' }}
-          >
-            x
-          </button>
-        )}
+            onChange={e => setSpeed(+e.currentTarget.value)}
+            step="0.1"
+            type="number"
+            style={{
+              width: 80,
+              fontSize: 20,
+              textAlign: 'center',
+              border: 'solid 2px',
+              color: 'yellow'
+            }}
+            value={speed}
+          />
+        </div>
+      </div>
+      <div className="tools">
         <button
           onClick={play}
           className="ui"
@@ -618,7 +567,7 @@ const Matrix = () => {
               .catch(() => playSound(0));
           }}
         >
-          S
+          save
         </button>
         <input
           onChange={e => setTitle(e.currentTarget.value)}

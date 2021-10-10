@@ -57,27 +57,25 @@ serviceErrorHandler ->
 				acc.set(item.code, { status: item.status, message: item.message })
 				<- acc
 			}, new Map)
-
-			productionErrors := (err, req, res, next) => {
-				res.status(err.status ?? 500).send({ error: err.message })
-			}
-
-			developmentErrors := (err, req, res, next) => {
-				err.stack = err.stack ?? ""
-				errorDetails := {
-					error: err.message,
-					status: err.status,
-					stackHighlighted: err.stack.split("\n").reduce((acc, item, index) => {
-						acc[index] = item.trim()
-						<- acc
-					}, {}),
-				}
-				res.status(err.status ?? 500).send(errorDetails)
-			}
 			
-			if (process.env.STAGE === "development") app.use(developmentErrors)
-			else if (process.env.STAGE === "production") app.use(productionErrors)
+			<- { app }
+
+	development -> process.env.STAGE === k:: && :::app.use((err, req, res, next) => {
+		err.stack = err.stack ?? ""
+		errorDetails := {
+			error: err.message,
+			status: err.status,
+			stackHighlighted: err.stack.split("\n").reduce((acc, item, index) => {
+				acc[index] = item.trim()
+				<- acc
+			}, {}),
+		}
+		res.status(err.status ?? 500).send(errorDetails)
+	})
 	
+	production -> process.env.STAGE === k:: && :::app.use((err, req, res, next) => {
+		res.status(err.status ?? 500).send({ error: err.message })
+	})
 
 sendError -> 
 	{ res, error } := ::

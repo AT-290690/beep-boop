@@ -23,10 +23,6 @@ button {
   opacity: 0;
 }
 
-.tools:hover {
-  opacity: 1;
-}
-
 .ui {
   font-family: 'Courier New';
   background-color: transparent;
@@ -56,12 +52,11 @@ button {
 .login {
   display: flex;
   position: absolute;
-  right: 0;
   z-index: 100;
 }
 .menu {
-  background: black;
-  z-index: 1000;
+  opacity: 0;
+  right: 0;
 }
 .login {
   bottom: 0;
@@ -71,7 +66,9 @@ button {
   margin: auto;
   opacity: 0;
 }
-.login:hover {
+.login:hover,
+.menu:hover,
+.tools:hover {
   opacity: 1;
 }
 
@@ -87,7 +84,7 @@ button {
   width: 25px;
   height: 25px;
   opacity: 0.1;
-  transition: all 200ms ease-in-out;
+  transition: all 120ms ease-in-out;
   /* transition: all 300ms ease-in-out; */
   outline: none;
 }
@@ -104,15 +101,14 @@ button {
   text-align: center;
   border-radius: 50%;
 }
-
-@media only screen and (max-width: 600px) {
+input {
+  padding-left: 10px;
+}
+@media only screen and (max-width: 700px) {
   input {
-    max-width: 80px !important;
+    max-width: 100px !important;
   }
   .menu {
     bottom: 0;
-  }
-  .icon {
-    display: none;
   }
 }
