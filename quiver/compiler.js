@@ -64,7 +64,7 @@ const compileToJs = async () => {
 
 export const compile = async (file, files = [], indentBy = '\t') => {
   console.log('\x1b[1m', '\x1b[34m', `\n < ${file} >\n`, '\x1b[0m');
-  settings.file = file;
+  settings.file = '.' + file;
   settings.files = files;
   settings.indentBy = indentBy;
   const { main, graph } = await compileToJs();

@@ -8,7 +8,7 @@ for (let i = 0; i < 7; i++) sounds.push(document.getElementById(`switch${i}`));
 const playSound = index => {
   const sound = sounds[index];
   if (sound) {
-    sound.volume = 0.1;
+    sound.volume = 0.5;
     sound.currentTime = 0;
     sound.play();
   }
@@ -574,7 +574,7 @@ const Matrix = () => {
           className="ui"
           placeholder="Title"
           style={{
-            border: 'solid 2px yellow',
+            border: 'none',
             color: 'white',
             maxWidth: 180
           }}

@@ -44,11 +44,11 @@ return qvr.out();
       });
     });
     const path = settings.file.split('/');
-    path.pop().split('.go')[0];
+    path.pop();
     const dir = path.join('/');
-    await mkdir(`./${dir}/dist`, { recursive: true });
+    await mkdir(`${dir}/dist`, { recursive: true });
     await writeFile(
-      `./${dir}/dist/${settings.files[0].split('.go')[0]}.js`,
+      `${dir}/dist/${settings.files[0].split('.go')[0]}.js`,
       `import { Quiver } from '${path
         .map(() => '../')
         .join('')}quiver/quiver.js';\n` + buildCode
