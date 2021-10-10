@@ -72,12 +72,10 @@ const LoginScreen = () => {
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState(null);
   const [loading, setLoading] = useState(null);
-
-  const logUser = () => {
+  const logUser = reg => {
     if (!username || !password) return;
     setLoading(true);
     setMessage(null);
-
     fetch(`${API_URL}/account/login`, {
       method: 'PUT',
       headers: {
@@ -85,7 +83,8 @@ const LoginScreen = () => {
       },
       body: JSON.stringify({
         username,
-        password
+        password,
+        reg
       })
     })
       .then(res => res.json())
@@ -126,7 +125,7 @@ const LoginScreen = () => {
         />
         <button
           className="ui"
-          onClick={() => logUser()}
+          onClick={() => logUser(true)}
           style={{ color: 'mediumaquamarine' }}
         >
           ᐉ
@@ -431,15 +430,12 @@ const Matrix = () => {
               margin: '0 15px'
             }}
             onClick={() => {
-              if (musicList.length) {
-                setIsMusicListOpen(!isMusicListOpen);
-              } else {
-                populateMusicList({
-                  username: sessionAuth.data.username,
-                  page: Math.floor(speed),
-                  perPage: 10
-                });
-              }
+              if (isMusicListOpen) return setIsMusicListOpen(false);
+              populateMusicList({
+                username: title || sessionAuth.data.username,
+                page: Math.floor(speed),
+                perPage: 10
+              });
             }}
           >
             ◆
@@ -631,7 +627,8 @@ const Matrix = () => {
                 onClick={() => addMusicFromList(musicList[index])}
                 key={music.title + '_' + index}
               >
-                {music.title.split(sessionAuth.data.username + "'s")[1]}
+                {music.title.split(sessionAuth.data.username + "'s")[1] ||
+                  music.title}
               </button>
             ))}
           </div>

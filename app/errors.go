@@ -51,6 +51,16 @@ serviceErrorHandler ->
 					status: 500,
 					message: "Lorem ispum error",
 				},
+				PASSWORD_TOO_SHORT: {
+					code: 15,
+					status: 500,
+					message: 'Password is too short(>=5)'
+				},
+				USERNAME_TOO_SHORT: {
+					code: 16,
+					status: 500,
+					message: 'Username is too short(>=5)'
+				}
 			}
 
 			@:serviceErrorStack = Object.values(@:serviceErrors).reduce((acc, item) => {

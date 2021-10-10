@@ -17,7 +17,7 @@ GET/byAuthor ->
 						.toArray()
 						) 
 				}
-			byAuthor[response] -> :::res.status(200).send(:::result)
+			byAuthor[response] -> :::result.length === 0 ? void #("byAuthor[parseQuery]", { res: :::res, author: "default", page: 0, perPage: 10 }) : :::res.status(200).send(:::result)
 
 GET/piece -> 
 	{ req, res } := ::

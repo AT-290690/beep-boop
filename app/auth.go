@@ -10,13 +10,25 @@ POST/register ->
 	register[request] -> 
 			{ data, res } := ::
 			{ username, password } := data
-
+			if (username.length <= 5) {
+				<- void #("sendError", {
+					error: @:serviceErrors.USERNAME_TOO_SHORT.code,
+					res
+				})
+			}
+			if (password.length <= 5) {
+				<- void #("sendError", {
+					error: @:serviceErrors.PASSWORD_TOO_SHORT.code,
+					res
+				})
+			}
 			if (await @:collections.users.findOne({ username })) {
 				<- void #("sendError", {
 						error: @:serviceErrors.DUPLICATE_USERNAME_RECORD.code,
 						res
 					})
 			}
+			
 	
 			hash := await @:helpers.hash(password, 10)
 			<- { username, hash, res }
@@ -26,18 +38,18 @@ POST/register ->
 				query := { username }
 				update := { $set: { username, password: hash } }
 				options := { upsert: true }
-				<- { query, update, options, res }
+				await @:collections.users.findOneAndUpdate(query, update, options)
+				<- { username, res }
 
-			mongoCreateUser -> { res: :::res, result: await @:collections.users.findOneAndUpdate(:::query, :::update, :::options) }
-
-				mongoCreateUserEnd -> :::res.status(201).send(:::result)	
+			redirectCreateUser -> void #("login[response]", { user: await @:collections.users.findOne({ username: :::username }), res: :::res })
 
 PUT/login -> 
 		{ req, res } := ::
+		if (req.body.reg) <- void #("POST/register", { res, req })
 		{ username, password } := req.body
 		<- { username, password, res, req }
 	login[request] -> 
-  	{ username, password, res, req } := ::
+  	{ username, password, res } := ::
 	     user := await @:collections.users.findOne({ username })
 		  	/*
 				username is not case sensitive
@@ -52,6 +64,7 @@ PUT/login ->
 				<- { user, res }
 		login[response] ->
 			{ user, res } := ::
+			console.log(user)
 			payload := {
 				id: user._id,
 				username: user.username
