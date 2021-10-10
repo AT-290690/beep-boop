@@ -64,7 +64,6 @@ PUT/login ->
 				<- { user, res }
 		login[response] ->
 			{ user, res } := ::
-			console.log(user)
 			payload := {
 				id: user._id,
 				username: user.username
