@@ -3,41 +3,40 @@ PORT = 9000
 STAGE = development  
 PRIVATE_KEY = secret  
 TOKEN_LIFETIME = 360000  
-DB = mongodb+srvVALUE//####################
+DB = mongodb+srv:://####################
 
-```
-  < ./app/index.go >
+```go
+ < /app/index.go >
 
  - 0 > modules
  - 1 >  connection
  - 1 >  app
  - 2 >   listen
 
- < ./app/auth.go >
+ < /app/auth.go >
 
  - 0 > POST/register
  - 1 >  register[request]
  - 2 >   createUser
- - 3 >    mongoCreateUser
- - 4 >     mongoCreateUserEnd
+ - 3 >    redirectCreateUser
  - 0 > PUT/login
  - 1 >  login[request]
  - 2 >   login[response]
  - 0 > PUT/logout
 
- < ./app/errors.go >
+ < /app/errors.go >
 
  - 0 > serviceErrorHandler
  - 1 >  development
  - 1 >  production
  - 0 > sendError
 
- < ./app/home.go >
+ < /app/home.go >
 
  - 0 > /
  - 0 > /about
 
- < ./app/middlewares.go >
+ < /app/middlewares.go >
 
  - 0 > middlewares
  - 1 >  bodyParser
@@ -46,7 +45,7 @@ DB = mongodb+srvVALUE//####################
  - 1 >  passport
  - 1 >  jwt
 
- < ./app/music.go >
+ < /app/music.go >
 
  - 0 > GET/byAuthor
  - 1 >  byAuthor[parseQuery]
@@ -62,7 +61,7 @@ DB = mongodb+srvVALUE//####################
  - 2 >   mongoCreatePiece
  - 3 >    createPieceEnd
 
- < ./app/router.go >
+ < /app/router.go >
 
  - 0 > router
  - 1 >  home
@@ -70,4 +69,5 @@ DB = mongodb+srvVALUE//####################
  - 1 >  account
 
 < [modules] index.go -> auth.go -> errors.go -> home.go -> middlewares.go -> music.go -> router.go >
+
 ```
