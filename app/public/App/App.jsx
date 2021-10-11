@@ -623,6 +623,7 @@ const Matrix = () => {
           <div className="music-list">
             {musicList.map((music, index) => (
               <button
+                style={{ color: '#' + intToRGB(hashCode(index + '1230')) }}
                 className="ui"
                 onClick={() => addMusicFromList(musicList[index])}
                 key={music.title + '_' + index}
