@@ -1,12 +1,12 @@
 middlewares ->
-  { imports, __dirname, app } := ::
+  { imports, __dirname, app } := VALUE
 	{ express } := imports
 	<- { express, imports, __dirname, app }
 
-	bodyParser -> void :::app.use((await import("body-parser")).default.json())
+	bodyParser -> void VALUE.app.use((await import("body-parser")).default.json())
 	
 	helmet -> 
-		{ app, imports } := ::
+		{ app, imports } := VALUE
 		helmet := (await import("helmet")).default
 		app.use(helmet(), helmet.contentSecurityPolicy({
 			directives: {
@@ -33,27 +33,27 @@ middlewares ->
 		}))
 
 	static -> 
-		{ express, __dirname, app } := ::
+		{ express, __dirname, app } := VALUE
 		app.use(express.static("app/public"))
-		#("serviceErrorHandler", { app })
+		#("serviceErrorHandler")({ app })
 		<- { app }
 	
 	passport ->
-		{ app } := ::
+		{ app } := VALUE
 		passport := (await import("passport")).default
 		passportJwt := (await import("passport-jwt")).default
 		options := {
 			secretOrKey: process.env.PRIVATE_KEY,
 			jwtFromRequest: passportJwt.ExtractJwt.fromAuthHeaderAsBearerToken(),
 		}
-		@:extractToken = (req) => {
+		MEMO.extractToken = (req) => {
 			if (req.headers.authorization && req.headers.authorization.split(' ')[0] === "Bearer") {
 					<- req.headers.authorization.split(' ')[1];
 			}
 			<- null;
 		}
 		
-	  @:authenticate = async (req, res, next) => {  
+	  MEMO.authenticate = async (req, res, next) => {  
 			passport.authenticate("jwt", { session: false }, async (error,  payload) => {
 				if (error || !payload) {
 					<- res
@@ -79,7 +79,7 @@ middlewares ->
 	jwt ->
   	jwt := (await import("jsonwebtoken")).default
 		// helper for creating token
-		@:helpers.createToken = (payload) => {
+		MEMO.helpers.createToken = (payload) => {
 			token := jwt.sign(payload, process.env.PRIVATE_KEY, { expiresIn: +process.env.TOKEN_LIFETIME })
 			<- token
 		}

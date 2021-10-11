@@ -1,5 +1,4 @@
 export class Quiver {
-  memo = {};
   func = {};
   nodes = {};
   root = null;
@@ -10,7 +9,9 @@ export class Quiver {
   setNodes(nodes) {
     this.nodes = Object.freeze(nodes);
   }
-
+  go(key) {
+    return args => this.goTo(key, args);
+  }
   async goTo(key, args, prev = null) {
     if (this.visited[key]) return;
     const node = this.nodes[key];
@@ -47,7 +48,6 @@ export class Quiver {
 
   reset() {
     this.restart();
-    this.memo = {};
   }
 
   restart() {

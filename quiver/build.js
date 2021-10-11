@@ -19,17 +19,19 @@ export const build = async (main, graph) => {
       node => node.type === 'root'
     ).key;
     logWarningMessage(`\n< [${root}] ${settings.files.join(' -> ')} >\n`);
-    const buildCode = `const qvr = new Quiver();
-qvr.setNodes(${JSON.stringify(
+    const buildCode = `const __qvr = new Quiver();
+__qvr.setNodes(${JSON.stringify(
       monolithNodes.reduce((acc, item) => ({ ...acc, ...item }), {})
     )});
+const NODES = __qvr.nodes;
+const MEMO = {};
 ${monolithArr.join('\n')}
 export default async (logging = false) => {
-qvr.logOn = logging;
-qvr.setRoot(qvr.nodes["${root}"].key);
-qvr.reset();
-await qvr.goTo(qvr.root);
-return qvr.out();
+__qvr.logOn = logging;
+__qvr.setRoot(__qvr.nodes["${root}"].key);
+__qvr.reset();
+await __qvr.goTo(__qvr.root);
+return __qvr.out();
 }`;
     const dubs = new Set();
     monolithNodes.forEach(collection => {

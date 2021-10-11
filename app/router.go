@@ -1,5 +1,5 @@
 router -> 
-		{ imports, __dirname, app } := ::
+		{ imports, __dirname, app } := VALUE
 		/* 
 		helper function 
 		that catches errors 
@@ -16,17 +16,17 @@ router ->
 		route[method.toLowerCase()]
 		(endpoint, access === "public" ? 
 		(req, res, next) => next() : 
-		@:authenticate , (req, res, next) => catchErrors(#(method + req.url.split('?')[0], { req, res, next }))) &&
+		MEMO.authenticate , (req, res, next) => catchErrors(#(method + req.url.split('?')[0])({ req, res, next }))) &&
 		listen(null, access, route))
 		<- { app , listen, __dirname }
 
 	home ->
-	  { app, __dirname } := ::
-	  app.get("/", (_, res) => #("/", { res, __dirname }))
-		app.get("/about", (_, res) => #("/about", { res, __dirname }))
+	  { app, __dirname } := VALUE
+	  app.get("/", (_, res) => #("/")({ res, __dirname }))
+		app.get("/about", (_, res) => #("/about")({ res, __dirname }))
 	
 	music -> 
-		{ app, listen } := ::
+		{ app, listen } := VALUE
 		listen("/music", "private")
 		("GET", "/byAuthor")
 		("GET", "/piece")
@@ -34,7 +34,7 @@ router ->
 		("DELETE", "/remove")
 
 	account -> 
-		{ app, listen } := ::
+		{ app, listen } := VALUE
 		listen("/account", "public")
 		("POST", "/register")
 		("PUT", "/login")

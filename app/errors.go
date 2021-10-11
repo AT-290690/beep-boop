@@ -1,7 +1,7 @@
 serviceErrorHandler -> 
-			{ app } := ::
+			{ app } := VALUE
 
-			@:serviceErrors = {
+			MEMO.serviceErrors = {
 				/** Such a record does not exist (when it is expected to exist) */
 				RECORD_NOT_FOUND: {
 					code: 1,
@@ -63,14 +63,14 @@ serviceErrorHandler ->
 				}
 			}
 
-			@:serviceErrorStack = Object.values(@:serviceErrors).reduce((acc, item) => {
+			MEMO.serviceErrorStack = Object.values(MEMO.serviceErrors).reduce((acc, item) => {
 				acc.set(item.code, { status: item.status, message: item.message })
 				<- acc
 			}, new Map)
 			
 			<- { app }
 
-	development -> process.env.STAGE === k:: && :::app.use((err, req, res, next) => {
+	development -> process.env.STAGE === KEY && VALUE.app.use((err, req, res, next) => {
 		err.stack = err.stack ?? ""
 		errorDetails := {
 			error: err.message,
@@ -83,13 +83,13 @@ serviceErrorHandler ->
 		res.status(err.status ?? 500).send(errorDetails)
 	})
 	
-	production -> process.env.STAGE === k:: && :::app.use((err, req, res, next) => {
+	production -> process.env.STAGE === KEY && VALUE.app.use((err, req, res, next) => {
 		res.status(err.status ?? 500).send({ error: err.message })
 	})
 
 sendError -> 
-	{ res, error } := ::
+	{ res, error } := VALUE
 	res
-	.status(@:serviceErrorStack.get(error).status)
-	.send({ error: @:serviceErrorStack.get(error).message })
+	.status(MEMO.serviceErrorStack.get(error).status)
+	.send({ error: MEMO.serviceErrorStack.get(error).message })
 			

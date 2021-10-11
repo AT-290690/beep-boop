@@ -9,15 +9,9 @@ export const settings = {
   indentBy: '\t',
   unaryTokens: {
     '<- ': 'return ',
-    '#': 'qvr.goTo',
-    '!#': 'qvr.visit',
-    ':::': '__value.',
-    '::': '__value',
-    'k::': '__key',
-    'p::': '__prev',
-    'n::': '__next',
-    '@:': 'qvr.memo.',
-    'nodes::': 'qvr.nodes'
+    '#': '__qvr.go',
+    '#!': '__qvr.leave',
+    '!#': '__qvr.visit'
   }
 };
 const parse = (source, tokens) => {
@@ -45,7 +39,7 @@ const compileToJs = async () => {
       const expression = parse(lambda[1]?.trim(), settings.unaryTokens);
       const body = expression ? 'return ' + expression : '';
       let startBrace = index !== 0 ? '}\n' : '';
-      compiledCode += `${startBrace}qvr.func["${key}"] = async (__value, __key, __prev, __next) => {\n${
+      compiledCode += `${startBrace}__qvr.func["${key}"] = async (VALUE, KEY, PREV, NEXT) => {\n${
         body ? body + '\n' : ''
       }`;
     } else {

@@ -10,7 +10,7 @@ modules ->
 		path: await import("path"),
 	}
 
-	@:helpers = {
+	MEMO.helpers = {
 		hash: imports.bcrypt.hash,
 		compare: imports.bcrypt.compare
 	}
@@ -20,7 +20,7 @@ modules ->
 	<- { imports, __dirname }	
 
 	connection ->
-		{ MongoClient } := :::imports.mongoDB
+		{ MongoClient } := VALUE.imports.mongoDB
 		uri := process.env.DB
 		mongoInstance := new MongoClient(uri, {
 		useNewUrlParser: true,
@@ -29,7 +29,7 @@ modules ->
 
 	 await mongoInstance.connect(error => {
 		if (error) <- console.log(error)
-		@:collections = {
+		MEMO.collections = {
 			users: mongoInstance
 			.db("test")
 			.collection("users"),
@@ -40,10 +40,10 @@ modules ->
 		})
 
 	app -> 
-		{ imports,  __dirname } := ::
+		{ imports,  __dirname } := VALUE
 		app := imports.express()
-		await #("middlewares", { imports, __dirname, app })
-   	await #("router", { imports, __dirname, app })
+		await #("middlewares")({ imports, __dirname, app })
+   	await #("router")({ imports, __dirname, app })
 
 		app.use((req, res, next) => {
 			error := new Error("Not Found")
@@ -54,7 +54,7 @@ modules ->
 		<- { app }
 
 		listen -> 
-			{ app } := ::
+			{ app } := VALUE
 			PORT := process.env.PORT
 			app.listen(PORT, err => {
 				if (err) console.log("could not start")
