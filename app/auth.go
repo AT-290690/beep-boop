@@ -9,19 +9,19 @@ POST/REGISTER :: { req, res } ->
 	REGISTER[request] * :: { data, res } -> 
 			{ username, password } := data
 			if (username.length <= 5) {
-				<- void ::go("SEND_ERROR")({
+				<- void ::arrows["SEND_ERROR"]({
 					error: MEMO.serviceErrors.USERNAME_TOO_SHORT.code,
 					res
 				})
 			}
 			if (password.length <= 5) {
-				<- void ::go("SEND_ERROR")({
+				<- void ::arrows["SEND_ERROR"]({
 					error: MEMO.serviceErrors.PASSWORD_TOO_SHORT.code,
 					res
 				})
 			}
 			if (~ MEMO.collections.users.findOne({ username })) {
-				<- void ::go("SEND_ERROR")({
+				<- void ::arrows["SEND_ERROR"]({
 						error: MEMO.serviceErrors.DUPLICATE_USERNAME_RECORD.code,
 						res
 					})
@@ -38,7 +38,7 @@ POST/REGISTER :: { req, res } ->
 				~ MEMO.collections.users.findOneAndUpdate(query, update, options)
 				<- { username, res }
 
-			REDIRECT_CREATE_USER * :: { username, res } -> void ::go("login[response]")({ user: ~ MEMO.collections.users.findOne({ username: username }), res })
+			REDIRECT_CREATE_USER * :: { username, res } -> void ::go("LOGIN[response]")({ user: ~ MEMO.collections.users.findOne({ username: username }), res })
 
 PUT/LOGIN :: { req, res } -> 
 		if (req.body.reg) <- void ::go("POST/REGISTER")({ res, req })
@@ -52,7 +52,7 @@ PUT/LOGIN :: { req, res } ->
 				password is case sensitive
 				*/
 				if (!user || !user.password || !(~ bcrypt.compare(password, user.password))) {
-					<- void ::go("SEND_ERROR")({
+					<- void ::arrows["SEND_ERROR"]({
 							error: MEMO.serviceErrors.INVALID_SIGNIN.code, 
 							res 
 					 })

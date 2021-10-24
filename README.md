@@ -6,11 +6,22 @@ TOKEN_LIFETIME = 360000
 DB = mongodb+srv:://####################
 
 ```go
- < /app/index.go >
+< /app/index.go >
 
  - 0 > MODULES
  - 1 >  CONNECTION
  - 1 >  APP
+ - 2 >   MIDDLEWARES
+ - 3 >    BODY_PARSER
+ - 3 >    HELMET
+ - 3 >    PASSPORT
+ - 3 >    STATIC
+ - 4 >     ROUTER
+ - 5 >      HOME
+ - 5 >      MUSIC
+ - 5 >      ACCOUNT
+ - 4 >     HANDLE_ERRORS
+ - 4 >     ERROR
  - 2 >   LISTEN
 
  < /app/auth.go >
@@ -29,21 +40,11 @@ DB = mongodb+srv:://####################
  - 0 > SERVICE_ERROR_HANDLER
  - 1 >  DEVELOPMENT
  - 1 >  PRODUCTION
- - 0 > SEND_ERROR
 
  < /app/home.go >
 
  - 0 > /
  - 0 > /ABOUT
-
- < /app/middlewares.go >
-
- - 0 > MIDDLEWARES
- - 1 >  BODY_PARSER
- - 1 >  HELMET
- - 1 >  STATIC
- - 1 >  PASSPORT
- - 1 >  JWT
 
  < /app/music.go >
 
@@ -61,13 +62,13 @@ DB = mongodb+srv:://####################
  - 2 >   MONGO_CREATE_PIECE
  - 3 >    CREATE_PIECE_END
 
- < /app/router.go >
+ < /app/utils.go >
 
- - 0 > ROUTER
- - 1 >  HOME
- - 1 >  MUSIC
- - 1 >  ACCOUNT
+ - 0 > SEND_ERROR
+ - 0 > JWT
+ - 0 > EXTRACT_TOKEN
+ - 0 > AUTHENTICATE
 
-< [MODULES] index.go -> auth.go -> errors.go -> home.go -> middlewares.go -> music.go -> router.go >
+< [MODULES] index.go -> auth.go -> errors.go -> home.go -> music.go -> utils.go >
 
 ```

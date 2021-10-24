@@ -19,7 +19,7 @@ GET/BY_AUTHOR :: { req, res } ->
 GET/PIECE * :: { req, res } -> 
 	result := await MEMO.collections.users.findOne({ title: req.query.title })
 	if (result) {
-		<- void ::go("SEND_ERROR")({
+		<- void ::arrows["SEND_ERROR"]({
 				error: MEMO.serviceErrors.RECORD_NOT_FOUND.code,
 				res
 			})
@@ -34,8 +34,8 @@ DELETE/REMOVE :: { req, res } ->
 			name := username + "'s " + title.trim()
 			query := { title: name }
 			MEMO.collections.music.deleteOne(query);
-			<- res
-		REMOVE_PIECE :: { status } -> status(201).send({ success: 1 })
+			<- { res }
+		REMOVE_PIECE :: { res } -> res.status(201).send({ success: 1 })
 
 POST/INSERT :: 	{ req, res } -> 
 			{ title, sheet, speed, offset } := req.body;
@@ -46,6 +46,6 @@ POST/INSERT :: 	{ req, res } ->
 			update := { $set: { title: name, username, speed, offset, sheet }}
 			options := { upsert: true }
 			<- { query, update, options, res }
-		MONGO_CREATE_PIECE * :: { query, update, options} -> { res, result: await MEMO.collections.music.findOneAndUpdate(query, update, options) }
+		MONGO_CREATE_PIECE * :: { res, query, update, options} -> { res, result: await MEMO.collections.music.findOneAndUpdate(query, update, options) }
 			CREATE_PIECE_END :: { res } -> res.status(201).send({ success: 1 })	
 		

@@ -94,6 +94,7 @@ const LoginScreen = () => {
         } else {
           setSessionAuth(res);
           setMessage('You are logged!');
+          setPassword('');
         }
       })
       .finally(() => setLoading(false));
@@ -230,7 +231,13 @@ const sound = new Tone.PolySynth(Tone.Synth, {
   envelope: {
     releaseCurve: 'sine'
   }
-}).toDestination();
+})
+  // .connect(new Tone.AutoPanner('8n').toDestination())
+  // .connect(new Tone.Distortion(2.8).toDestination())
+  // .connect(new Tone.Chorus(4, 3.5, 0.5).toDestination())
+  // .connect(new Tone.Tremolo(9, 0.75).toDestination())
+  // .connect(new Tone.Vibrato(9, 0.75).toDestination())
+  .toDestination();
 
 Tone.context.lookAhead = 0.2;
 const clearAllTimeouts = () => {
@@ -244,7 +251,7 @@ const clearAllTimeouts = () => {
 const Matrix = () => {
   const [mod] = useState(15);
   const [width] = useState(15);
-  const [offset, setOffset] = useState(12);
+  const [offset, setOffset] = useState(20);
   const [Notes, setNotes] = useState(AllNotes.slice(offset, offset + width));
   const [speed, setSpeed] = useState(0.25);
   const [pagination, setPagination] = useState(0);
@@ -253,6 +260,8 @@ const Matrix = () => {
   const [reload, setReload] = useState(true);
   const [load, setLoad] = useState(false);
   const [title, setTitle] = useState('');
+  const [author, setAuthor] = useState('');
+  const [authorPage, setAuthorPage] = useState(0);
   const [isMusicListOpen, setIsMusicListOpen] = useState(false);
   const [musicList, setMusicList] = useState([]);
   const { sessionAuth } = useContext(AuthContext);
@@ -288,6 +297,7 @@ const Matrix = () => {
     setIsMusicListOpen(false);
     setPagination(0);
     setReload(!reload);
+    editMode();
     playSound(6);
   };
 
@@ -369,7 +379,7 @@ const Matrix = () => {
             sound.triggerAttackRelease(value, delay);
             element.style.opacity = '1';
             element.firstChild.style.transform = `scale(${
-              delay > 0.1 ? delay * 2 + 1.5 : 1.5
+              delay > 0.1 ? delay * 2 + 1 : 1
             })`;
             setTimeout(() => {
               element.style.opacity = '0.1';
@@ -432,9 +442,9 @@ const Matrix = () => {
             onClick={() => {
               if (isMusicListOpen) return setIsMusicListOpen(false);
               populateMusicList({
-                username: title || sessionAuth.data.username,
-                page: Math.floor(speed),
-                perPage: 10
+                username: author || sessionAuth.data.username,
+                page: Math.floor(authorPage),
+                perPage: 5
               });
             }}
           >
@@ -567,7 +577,7 @@ const Matrix = () => {
         </button>
         <input
           onChange={e => setTitle(e.currentTarget.value)}
-          className="ui"
+          className="ui title"
           placeholder="Title"
           style={{
             border: 'none',
@@ -620,6 +630,47 @@ const Matrix = () => {
             zIndex: 1000
           }}
         >
+          <input
+            onChange={e => setAuthor(e.currentTarget.value)}
+            onKeyPress={e =>
+              e.key === 'Enter' &&
+              populateMusicList({
+                username: author || sessionAuth.data.username,
+                page: Math.floor(authorPage),
+                perPage: 5
+              })
+            }
+            className="ui"
+            placeholder="Author"
+            value={author}
+            style={{
+              border: 'none',
+              color: 'white',
+              maxWidth: 280
+            }}
+          />
+          <input
+            className="ui"
+            onChange={e => {
+              setAuthorPage(+e.currentTarget.value);
+              populateMusicList({
+                username: author || sessionAuth.data.username,
+                page: Math.floor(+e.currentTarget.value),
+                perPage: 5
+              });
+            }}
+            value={authorPage}
+            type="number"
+            min={0}
+            style={{
+              width: '50px',
+              textAlign: 'center',
+              fontSize: '20px',
+              border: 'solid 2px springgreen',
+              color: 'springgreen'
+            }}
+          />
+
           <div className="music-list">
             {musicList.map((music, index) => (
               <button

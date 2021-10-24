@@ -83,7 +83,4 @@ SERVICE_ERROR_HANDLER ! :: { app } ->
 	
 	PRODUCTION :: { app } -> process.env.STAGE === key && app.use((err, req, res, next) => {
 		res.status(err.status ?? 500).send({ error: err.message })
-	})
-
-SEND_ERROR :: { res, error } -> res.status(MEMO.serviceErrorStack.get(error).status).send({ error: MEMO.serviceErrorStack.get(error).message })
-			
+	})			

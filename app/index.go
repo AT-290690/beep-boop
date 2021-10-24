@@ -26,7 +26,7 @@ MODULES ! ->
 		useUnifiedTopology: true
 		})
 
-	 await mongoInstance.connect(error => {
+	 ~ mongoInstance.connect(error => {
 		if (error) <- console.log(error)
 		MEMO.collections = {
 			users: mongoInstance
@@ -40,16 +40,114 @@ MODULES ! ->
 
 	APP * ! :: { __dirname } -> 
 		app := express()
-		~ ::go("MIDDLEWARES")({ __dirname, app })
-   	~ ::go("ROUTER")({ __dirname, app })
+		<- { app, __dirname }
+		
+		MIDDLEWARES ! -> value
+			BODY_PARSER :: { app } -> void app.use(bodyParser.json())
+			
+			HELMET :: { app } -> 
+				app.use(helmet(), helmet.contentSecurityPolicy({
+					directives: {
+						defaultSrc: ["'self'"],
+						connectSrc: ["'self'", 'https://*'],
+						fontSrc: ['*'],
+						styleSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", '*'],
+						workerSrc: ["'self'", 'data:', 'blob:'],
+						frameSrc: [
+							"'self'",
+						],
+						scriptSrc: [
+							"'self'",
+							"'unsafe-inline'",
+							"'unsafe-eval'",
+							'http://cdnjs.cloudflare.com/',
+							'https://unpkg.com/',
+						],
+						objectSrc: ["'none'"],
+						imgSrc: ["'self'", 'data: *'],
+						upgradeInsecureRequests: []
+					},
+					reportOnly: false
+				}))
+			
+			PASSPORT :: { app } ->
+				options := {
+					secretOrKey: process.env.PRIVATE_KEY,
+					jwtFromRequest: passportJwt.ExtractJwt.fromAuthHeaderAsBearerToken(),
+				}
+				
+				jwtStrategy := new passportJwt.Strategy(options, async (payload, done) => {
+				userData := {
+							id: payload.id,
+							username: payload.username,
+					}
+					// userData will be set as `req.user` in the `next` middleware
+					done(null, userData)
+				})
+				passport.use(jwtStrategy)
+				app.use(passport.initialize())
+				
+			STATIC :: { __dirname, app } -> 
+			app.use(express.static("app/public"))
+			<- { __dirname, app }
 
-		app.use((req, res, next) => {
-			error := new Error("Not Found")
-			error.status = 404
-			next(error)
-		})
+				ROUTER ! :: { __dirname, app } -> 
+					/* 
+					helper function 
+					that catches errors 
+					*/
+				catchErrors := (fn) => (req, res, next) => fn(req, res, next).catch(next)
+					/* 
+					helper function 
+					creating endpoints and
+					handling goTo to requested node 
+					*/
+					listen := (path, access = "public", route = express.Router()) =>
+					(path ? app.use(path, route) : true) && 
+					((method, endpoint) => 
+					route[method?.toLowerCase()]
+					(endpoint, access === "public" ? 
+					(req, res, next) => next() : 
+					(req, res, next) => {  
+						passport.authenticate("jwt", { session: false }, async (error,  payload) => {
+							if (error || !payload) {
+								<- res
+									.status(401)
+									.json({ error: "Unauthorized, invalid credentials." })
+							}
+							req.user = payload
+							next()
+						})(req, res, next)
+					}, (req, res, next) => catchErrors(::go(method + req.url.split('?')[0])({ req, res, next }))) &&
+					listen(null, access, route))
+					<- { app , listen, __dirname }
 
-		<- { app }
+					HOME :: { app, __dirname } ->
+						app.get("/", (_, res) => ::go("/")({ res, __dirname }))
+						app.get("/ABOUT", (_, res) => ::go("/ABOUT")({ res, __dirname }))
+					
+					MUSIC :: { app, listen } -> listen 
+						("/MUSIC", "private")
+						("GET", "/BY_AUTHOR")
+						("GET", "/PIECE")
+						("POST", "/INSERT")
+						("DELETE", "/REMOVE")
+
+					ACCOUNT :: { app, listen } -> listen
+						("/ACCOUNT", "public")
+						("POST", "/REGISTER")
+						("PUT", "/LOGIN")
+						("PUT", "/LOGOUT")
+
+				HANDLE_ERRORS :: { app } -> ::go("SERVICE_ERROR_HANDLER")({ app })
+
+				ERROR :: { app } -> 
+					app.use((req, res, next) => {
+						error := new Error("Not Found")
+						error.status = 404
+						next(error)
+					})
+
 
 		LISTEN ! :: { app } -> 
 			PORT := process.env.PORT

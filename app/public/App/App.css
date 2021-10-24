@@ -74,7 +74,7 @@ button {
 .matrix {
   display: grid;
   gap: 10px;
-  margin: 5% 1%;
+  margin: 4%;
 }
 
 .note-button {
@@ -105,9 +105,19 @@ input {
 }
 @media only screen and (max-width: 700px) {
   input {
+    max-width: 200px !important;
+  }
+  .title {
     max-width: 100px !important;
   }
   .menu {
-    bottom: 0;
+    bottom: 80px;
+    left: 25%;
+  }
+
+  .matrix {
+    display: grid;
+    gap: 2px;
+    margin: 3% 0.5%;
   }
 }
