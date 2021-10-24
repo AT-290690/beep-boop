@@ -76,7 +76,7 @@ const LoginScreen = () => {
     if (!username || !password) return;
     setLoading(true);
     setMessage(null);
-    fetch(`${API_URL}/account/login`, {
+    fetch(`${API_URL}/ACCOUNT/LOGIN`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json'
@@ -263,7 +263,7 @@ const Matrix = () => {
   const populateMusicList = ({ username, page, perPage }) => {
     setIsMusicListOpen(true);
     fetch(
-      `${API_URL}/music/byAuthor?author=${username}&page=${page}&perPage=${perPage}`,
+      `${API_URL}/MUSIC/BY_AUTHOR?author=${username}&page=${page}&perPage=${perPage}`,
       {
         method: 'GET',
         headers: {
@@ -317,7 +317,7 @@ const Matrix = () => {
     setLoad(false);
     setReload(!reload);
     if (title.trim()) {
-      fetch(`${API_URL}/music/remove`, {
+      fetch(`${API_URL}/MUSIC/REMOVE`, {
         method: 'DELETE',
         headers: {
           Authorization: 'Bearer ' + sessionAuth.token,
@@ -546,7 +546,7 @@ const Matrix = () => {
           className="ui"
           style={{ color: 'cyan' }}
           onClick={() => {
-            fetch(`${API_URL}/music/insert`, {
+            fetch(`${API_URL}/MUSIC/INSERT`, {
               method: 'POST',
               headers: {
                 Authorization: 'Bearer ' + sessionAuth.token,

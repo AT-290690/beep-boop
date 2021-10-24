@@ -1,26 +1,25 @@
-modules -> 
-	imports := {
-		express: (await import("express")).default,
-		mongoDB: (await import("mongodb")).default,
-		dotevn: await import("dotenv"),
-		bcrypt: (await import("bcrypt")).default
-	}
-	miscs := {
-		URL: await import("url"),
-		path: await import("path"),
-	}
+import express from 'express';
+import mongoDB from 'mongodb';
+import dotevn from 'dotenv';
+import bcrypt from 'bcrypt';
+import URL from 'url';
+import path from 'path';
+import bodyParser from 'body-parser';
+import jwt from 'jsonwebtoken';
+import passport from "passport";
+import passportJwt from 'passport-jwt';
+import helmet from "helmet";
 
-	MEMO.helpers = {
-		hash: imports.bcrypt.hash,
-		compare: imports.bcrypt.compare
-	}
-	
-	imports.dotevn.config()
-	__dirname := miscs.path.dirname(miscs.URL.fileURLToPath(import.meta.url))
-	<- { imports, __dirname }	
+const MEMO = {};
 
-	connection ->
-		{ MongoClient } := VALUE.imports.mongoDB
+>>->
+MODULES ! -> 
+	dotevn.config()
+	__dirname := path.dirname(URL.fileURLToPath(import.meta.url))
+	<- { __dirname }	
+
+	CONNECTION * ! ->
+		{ MongoClient } := mongoDB
 		uri := process.env.DB
 		mongoInstance := new MongoClient(uri, {
 		useNewUrlParser: true,
@@ -39,11 +38,10 @@ modules ->
 		}
 		})
 
-	app -> 
-		{ imports,  __dirname } := VALUE
-		app := imports.express()
-		await #("middlewares")({ imports, __dirname, app })
-   	await #("router")({ imports, __dirname, app })
+	APP * ! :: { __dirname } -> 
+		app := express()
+		~ ::go("MIDDLEWARES")({ __dirname, app })
+   	~ ::go("ROUTER")({ __dirname, app })
 
 		app.use((req, res, next) => {
 			error := new Error("Not Found")
@@ -53,22 +51,24 @@ modules ->
 
 		<- { app }
 
-		listen -> 
-			{ app } := VALUE
+		LISTEN ! :: { app } -> 
 			PORT := process.env.PORT
 			app.listen(PORT, err => {
-				if (err) console.log("could not start")
+				if (err) {
+					setTimeout( ()=> {
+						::leave("MODULES")
+						::leave("MIDDLEWARES")
+						::leave("SERVICE_ERROR_HANDLER")
+						::leave("CONNECTION")
+						::leave("ROUTER")
+						::leave("APP")
+						::leave("LISTEN")
+						::go("MODULES")()
+					}, 3000)
+					console.log("Could not start. Trying again in 3 sec")
+				}
 				else {
 					console.log(`Listening on port ${PORT}`)
-					// block these nodes
-					!#("modules")
-					!#("middlewares")
-					!#("serviceErrorHandler")
-					!#("connection")
-					!#("router")
-					!#("app")
-					!#("listen")
-					!#("serviceErrorHandler")
 				}
 			})
 			<- "Starting server!"

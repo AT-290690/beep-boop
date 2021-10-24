@@ -19,19 +19,15 @@ export const build = async (main, graph) => {
       node => node.type === 'root'
     ).key;
     logWarningMessage(`\n< [${root}] ${settings.files.join(' -> ')} >\n`);
-    const buildCode = `const __qvr = new Quiver();
-__qvr.setNodes(${JSON.stringify(
+    const buildCode = `const ${settings.namespace} = new Quiver();
+${settings.namespace}.setNodes(${JSON.stringify(
       monolithNodes.reduce((acc, item) => ({ ...acc, ...item }), {})
     )});
-const NODES = __qvr.nodes;
-const MEMO = {};
 ${monolithArr.join('\n')}
-export default async (logging = false) => {
-__qvr.logOn = logging;
-__qvr.setRoot(__qvr.nodes["${root}"].key);
-__qvr.reset();
-await __qvr.goTo(__qvr.root);
-return __qvr.out();
+export default (value) => {
+${settings.namespace}.setRoot(${settings.namespace}.nodes["${root}"].key);
+${settings.namespace}.visited = {};
+${settings.namespace}.goTo(${settings.namespace}.root, value);
 }`;
     const dubs = new Set();
     monolithNodes.forEach(collection => {
@@ -50,12 +46,14 @@ return __qvr.out();
     const dir = path.join('/');
     await mkdir(`${dir}/dist`, { recursive: true });
     await writeFile(
-      `${dir}/dist/${settings.files[0].split('.go')[0]}.js`,
-      `import { Quiver } from '${path
+      `${dir}/dist/${settings.files[0].split('.go')[0]}.${settings.mime}`,
+      `'use strict';\nimport { Quiver } from '${path
         .map(() => '../')
         .join('')}quiver/quiver.js';\n` + buildCode
     );
-    logSuccessMessage(`${settings.files[0].split('.go')[0]}.js is generated!`);
+    logSuccessMessage(
+      `${settings.files[0].split('.go')[0]}.${settings.mime} is generated!`
+    );
     errors.count
       ? logErrorMessage(
           errors.count === 1

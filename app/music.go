@@ -1,11 +1,8 @@
-GET/byAuthor -> 
- { req, res } := VALUE
+GET/BY_AUTHOR :: { req, res } -> 
  {  query: { author, page, perPage } } := req
  <- { res, author, page, perPage }
-	byAuthor[parseQuery] -> { res: VALUE.res, author: VALUE.author?.trim() || '', page: +VALUE.page || 0, perPage: +VALUE.perPage || 10 }
-		byAuthor[fetchFromDB] -> 
-			{ res, author, page, perPage } := VALUE
-			<- { 
+	BY_AUTHOR[parseQuery] :: { res, author, page, perPage } -> { res, author: author?.trim() || '', page: +page || 0, perPage: +perPage || 10 }
+		BY_AUTHOR[fetchFromDB] * :: { res, author, page, perPage } -> { 
 				 res, 
 				 result: await (
 					MEMO.collections.music
@@ -17,43 +14,38 @@ GET/byAuthor ->
 						.toArray()
 						) 
 				}
-			byAuthor[response] -> VALUE.result.length === 0 ? void #("byAuthor[parseQuery]")({ res: VALUE.res, author: "default", page: 0, perPage: 10 }) : VALUE.res.status(200).send(VALUE.result)
+			BY_AUTHOR[response] :: { res, result } -> result.length === 0 ? void ::go("BY_AUTHOR[parseQuery]")({ res, author: "default", page: 0, perPage: 10 }) : res.status(200).send(result)
 
-GET/piece -> 
-	{ req, res } := VALUE
+GET/PIECE * :: { req, res } -> 
 	result := await MEMO.collections.users.findOne({ title: req.query.title })
 	if (result) {
-		<- void #("sendError")({
+		<- void ::go("SEND_ERROR")({
 				error: MEMO.serviceErrors.RECORD_NOT_FOUND.code,
 				res
 			})
 	}
 	<- { res, result }
-	piece[response] -> VALUE.res.status(200).send(VALUE.result)
+	PIECE[response] :: { res, result } -> res.status(200).send(result)
 
-DELETE/remove -> 
-	{ req, res } := VALUE
+DELETE/REMOVE :: { req, res } -> 
 	{ title, sheet, speed, offset } := req.body;
 	<- { title, sheet, res, username: req.user.username, speed, offset }
-	mongoRemovePiece -> 
-			{ title, username, res } := VALUE
+	MONGO_REMOVE_PIECE :: { title, username, res } -> 
 			name := username + "'s " + title.trim()
 			query := { title: name }
 			MEMO.collections.music.deleteOne(query);
 			<- res
-		removePieceEnd -> VALUE.status(201).send({ success: 1 })
+		REMOVE_PIECE :: { status } -> status(201).send({ success: 1 })
 
-POST/insert -> 
-			{ req, res } := VALUE
+POST/INSERT :: 	{ req, res } -> 
 			{ title, sheet, speed, offset } := req.body;
 			<- { title:title?.trim() || new Date().getTime(), sheet, res, username: req.user.username, speed, offset }
-	createPiece -> 
-			{ title, sheet, username, res, speed, offset } := VALUE
+	CREATE_PIECE :: { title, sheet, username, res, speed, offset } -> 
 			name := username + "'s " + title
 			query := { title: name }
 			update := { $set: { title: name, username, speed, offset, sheet }}
 			options := { upsert: true }
 			<- { query, update, options, res }
-		mongoCreatePiece -> { res: VALUE.res, result: await MEMO.collections.music.findOneAndUpdate(VALUE.query, VALUE.update, VALUE.options) }
-			createPieceEnd -> VALUE.res.status(201).send({ success: 1 })	
+		MONGO_CREATE_PIECE * :: { query, update, options} -> { res, result: await MEMO.collections.music.findOneAndUpdate(query, update, options) }
+			CREATE_PIECE_END :: { res } -> res.status(201).send({ success: 1 })	
 		

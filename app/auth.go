@@ -1,5 +1,4 @@
-POST/register ->
-			{ req, res } := VALUE
+POST/REGISTER :: { req, res } ->
 			{ username, password } := req.body
 			data := {
 				username,
@@ -7,72 +6,68 @@ POST/register ->
 			}
 			<- { data, res }
 			
-	register[request] -> 
-			{ data, res } := VALUE
+	REGISTER[request] * :: { data, res } -> 
 			{ username, password } := data
 			if (username.length <= 5) {
-				<- void #("sendError")({
+				<- void ::go("SEND_ERROR")({
 					error: MEMO.serviceErrors.USERNAME_TOO_SHORT.code,
 					res
 				})
 			}
 			if (password.length <= 5) {
-				<- void #("sendError")({
+				<- void ::go("SEND_ERROR")({
 					error: MEMO.serviceErrors.PASSWORD_TOO_SHORT.code,
 					res
 				})
 			}
-			if (await MEMO.collections.users.findOne({ username })) {
-				<- void #("sendError")({
+			if (~ MEMO.collections.users.findOne({ username })) {
+				<- void ::go("SEND_ERROR")({
 						error: MEMO.serviceErrors.DUPLICATE_USERNAME_RECORD.code,
 						res
 					})
 			}
 			
 	
-			hash := await MEMO.helpers.hash(password, 10)
+			hash := ~ bcrypt.hash(password, 10)
 			<- { username, hash, res }
 
-		createUser -> 
-				{ username, hash, res } := VALUE
+		CREATE_USER * :: { username, hash, res } -> 
 				query := { username }
 				update := { $set: { username, password: hash } }
 				options := { upsert: true }
-				await MEMO.collections.users.findOneAndUpdate(query, update, options)
+				~ MEMO.collections.users.findOneAndUpdate(query, update, options)
 				<- { username, res }
 
-			redirectCreateUser -> void #("login[response]")({ user: await MEMO.collections.users.findOne({ username: VALUE.username }), res: VALUE.res })
+			REDIRECT_CREATE_USER * :: { username, res } -> void ::go("login[response]")({ user: ~ MEMO.collections.users.findOne({ username: username }), res })
 
-PUT/login -> 
-		{ req, res } := VALUE
-		if (req.body.reg) <- void #("POST/register")({ res, req })
+PUT/LOGIN :: { req, res } -> 
+		if (req.body.reg) <- void ::go("POST/REGISTER")({ res, req })
 		{ username, password } := req.body
 		<- { username, password, res, req }
-	login[request] -> 
-  	{ username, password, res } := VALUE
-	     user := await MEMO.collections.users.findOne({ username })
+
+	LOGIN[request] * :: { username, password, res } -> 
+	     user := ~ MEMO.collections.users.findOne({ username })
 		  	/*
 				username is not case sensitive
 				password is case sensitive
 				*/
-				if (!user || !user.password || !(await MEMO.helpers.compare(password, user.password))) {
-					<- void #("sendError")({
+				if (!user || !user.password || !(~ bcrypt.compare(password, user.password))) {
+					<- void ::go("SEND_ERROR")({
 							error: MEMO.serviceErrors.INVALID_SIGNIN.code, 
 							res 
 					 })
 				}
 				<- { user, res }
-		login[response] ->
-			{ user, res } := VALUE
+
+		LOGIN[response] * :: { user, res } ->
 			payload := {
 				id: user._id,
 				username: user.username
 			}
-			token := MEMO.helpers.createToken(payload)
+			token := ::arrows["JWT"]({ payload })
 			res.status(200).send({ data: payload, token })
 			
 
-PUT/logout -> 
-	{ req, res } := VALUE
+PUT/LOGOUT :: { req, res } -> 
 		req.logout()
 		res.status(200).send({ message: "Good bye. I will miss you :(" })

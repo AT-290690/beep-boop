@@ -1,6 +1,4 @@
-serviceErrorHandler -> 
-			{ app } := VALUE
-
+SERVICE_ERROR_HANDLER ! :: { app } -> 
 			MEMO.serviceErrors = {
 				/** Such a record does not exist (when it is expected to exist) */
 				RECORD_NOT_FOUND: {
@@ -70,7 +68,7 @@ serviceErrorHandler ->
 			
 			<- { app }
 
-	development -> process.env.STAGE === KEY && VALUE.app.use((err, req, res, next) => {
+	DEVELOPMENT :: { app } -> process.env.STAGE === key && app.use((err, req, res, next) => {
 		err.stack = err.stack ?? ""
 		errorDetails := {
 			error: err.message,
@@ -83,13 +81,9 @@ serviceErrorHandler ->
 		res.status(err.status ?? 500).send(errorDetails)
 	})
 	
-	production -> process.env.STAGE === KEY && VALUE.app.use((err, req, res, next) => {
+	PRODUCTION :: { app } -> process.env.STAGE === key && app.use((err, req, res, next) => {
 		res.status(err.status ?? 500).send({ error: err.message })
 	})
 
-sendError -> 
-	{ res, error } := VALUE
-	res
-	.status(MEMO.serviceErrorStack.get(error).status)
-	.send({ error: MEMO.serviceErrorStack.get(error).message })
+SEND_ERROR :: { res, error } -> res.status(MEMO.serviceErrorStack.get(error).status).send({ error: MEMO.serviceErrorStack.get(error).message })
 			
