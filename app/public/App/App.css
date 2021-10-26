@@ -54,6 +54,7 @@ button {
   position: absolute;
   z-index: 100;
 }
+
 .menu {
   opacity: 0;
   right: 0;
@@ -64,6 +65,12 @@ button {
   width: 600px;
   margin: auto;
   opacity: 0;
+}
+.login_force {
+  display: flex;
+  z-index: 100;
+  margin: 32px;
+  opacity: 100;
 }
 .login:hover,
 .menu:hover,

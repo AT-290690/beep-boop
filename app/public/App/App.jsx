@@ -4,7 +4,6 @@ import decode from '../decode.js';
 const elementsMap = new Map();
 const sounds = [];
 for (let i = 0; i < 7; i++) sounds.push(document.getElementById(`switch${i}`));
-
 const playSound = index => {
   const sound = sounds[index];
   if (sound) {
@@ -71,7 +70,7 @@ const LoginScreen = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState(null);
-  const [loading, setLoading] = useState(null);
+  const [loading, setLoading] = useState(false);
   const logUser = reg => {
     if (!username || !password) return;
     setLoading(true);
@@ -101,7 +100,24 @@ const LoginScreen = () => {
   };
   return (
     <>
-      <div className="login">
+      {!loading && !sessionAuth ? (
+        <p
+          className="ui"
+          style={{
+            color: message && message !== loginMessage ? 'red' : 'limegreen',
+            textAlign: 'left',
+            margin: 32,
+            maxWidth: 800,
+            height: 150
+          }}
+        >
+          {message
+            ? message
+            : `Please login or register first! To register press the arrow, to login
+          press Enter on password`}
+        </p>
+      ) : null}
+      <div className={sessionAuth ? 'login' : 'login_force'}>
         <input
           onChange={e => setUsername(e.currentTarget.value)}
           className="ui"
@@ -265,6 +281,25 @@ const Matrix = () => {
   const [isMusicListOpen, setIsMusicListOpen] = useState(false);
   const [musicList, setMusicList] = useState([]);
   const { sessionAuth } = useContext(AuthContext);
+
+  useEffect(() => {
+    if (!sessionAuth) {
+      return;
+    }
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('title')) {
+      fetch(`${API_URL}/MUSIC/PIECE?title=${urlParams.get('title')}`, {
+        method: 'GET',
+        headers: {
+          Authorization: 'Bearer ' + sessionAuth.token,
+          'Content-Type': 'application/json'
+        }
+      })
+        .then(res => res.json())
+        .then(res => (!res.error ? addMusicFromList(res) : alert(res.error)));
+    }
+  }, []);
+
   useEffect(() => {
     setLoad(true);
   }, [reload]);
@@ -288,22 +323,18 @@ const Matrix = () => {
   const addMusicFromList = current => {
     setLoad(false);
     setSpeed(current.speed);
-
-    if (current.offset !== offset) {
-      setOffset(current.offset);
-      const newNotes = AllNotes.slice(current.offset, current.offset + width);
-      setNotes(newNotes);
-      calibrateNotes(newNotes);
-    }
+    setOffset(current.offset);
+    const newNotes = AllNotes.slice(current.offset, current.offset + width);
+    setNotes(newNotes);
+    calibrateNotes(newNotes, current.sheet);
     setSheet(current.sheet);
     setIsMusicListOpen(false);
     setPagination(0);
     setReload(!reload);
     editMode();
-    playSound(6);
   };
 
-  const calibrateNotes = (notes = Notes) => {
+  const calibrateNotes = (notes = Notes, sheet = sheet) => {
     Object.values(sheet).forEach(
       note => (sheet[getNoteId(note)].value = notes[note.y])
     );
@@ -314,7 +345,7 @@ const Matrix = () => {
     playSound(3);
     const newNotes = AllNotes.slice(value, value + width);
     setNotes(newNotes);
-    calibrateNotes(newNotes);
+    calibrateNotes(newNotes, sheet);
     setReload(!reload);
   };
 
@@ -374,7 +405,7 @@ const Matrix = () => {
             sound.triggerAttackRelease(value, delay);
             element.style.opacity = '1';
             element.firstChild.style.transform = `scale(${
-              delay > 0.1 ? delay * 2 + 1 : 1
+              delay > 0.1 ? delay * 2 + 1.2 : 1.2
             })`;
             setTimeout(() => {
               element.style.opacity = '0.1';
@@ -671,7 +702,13 @@ const Matrix = () => {
               <button
                 style={{ color: '#' + intToRGB(hashCode(index + '1230')) }}
                 className="ui"
-                onClick={() => addMusicFromList(musicList[index])}
+                onClick={() => {
+                  addMusicFromList(musicList[index]);
+                  const urlParams = new URLSearchParams(window.location.search);
+                  urlParams.set('title', musicList[index].title);
+                  history.pushState({}, null, '?' + urlParams.toString());
+                  playSound(6);
+                }}
                 key={music.title + '_' + index}
               >
                 {music.title.split(sessionAuth.data.username + "'s")[1] ||
@@ -719,7 +756,7 @@ const App = () => {
     <AuthContext.Provider value={{ sessionAuth, setSessionAuth: setSession }}>
       <div className="App">
         <LoginScreen />
-        <Matrix />
+        {sessionAuth ? <Matrix /> : null}
       </div>
     </AuthContext.Provider>
   );

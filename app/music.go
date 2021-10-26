@@ -17,8 +17,10 @@ GET/BY_AUTHOR :: { req, res } ->
 			BY_AUTHOR[response] :: { res, result } -> result.length === 0 ? void ::go("BY_AUTHOR[parseQuery]")({ res, author: "default", page: 0, perPage: 10 }) : res.status(200).send(result)
 
 GET/PIECE * :: { req, res } -> 
-	result := await MEMO.collections.users.findOne({ title: req.query.title })
-	if (result) {
+	result := await MEMO.collections.music
+	.findOne({ title: req.query.title })
+
+	if (!result) {
 		<- void ::arrows["SEND_ERROR"]({
 				error: MEMO.serviceErrors.RECORD_NOT_FOUND.code,
 				res
