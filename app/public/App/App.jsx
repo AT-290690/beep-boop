@@ -288,10 +288,12 @@ const Matrix = () => {
   const addMusicFromList = current => {
     setLoad(false);
     setSpeed(current.speed);
+
     if (current.offset !== offset) {
       setOffset(current.offset);
       const newNotes = AllNotes.slice(current.offset, current.offset + width);
       setNotes(newNotes);
+      calibrateNotes(newNotes);
     }
     setSheet(current.sheet);
     setIsMusicListOpen(false);
@@ -301,21 +303,18 @@ const Matrix = () => {
     playSound(6);
   };
 
-  const calibrateNotes = () => {
+  const calibrateNotes = (notes = Notes) => {
     Object.values(sheet).forEach(
-      note => (sheet[getNoteId(note)].value = Notes[note.y])
+      note => (sheet[getNoteId(note)].value = notes[note.y])
     );
   };
 
-  const offsetNotes = e => {
+  const offsetNotes = value => {
     setLoad(false);
     playSound(3);
-    const newNotes = AllNotes.slice(
-      +e.currentTarget.value,
-      +e.currentTarget.value + width
-    );
+    const newNotes = AllNotes.slice(value, value + width);
     setNotes(newNotes);
-    calibrateNotes();
+    calibrateNotes(newNotes);
     setReload(!reload);
   };
 
@@ -350,21 +349,17 @@ const Matrix = () => {
           elem.style.opacity = '0.1';
         }
       });
-      const sheetArr = Object.values(sheet)
-        // .sort((prev, next) =>
-        //   prev[2] * 10 + prev[3] >= next[2] * 10 + next[3] ? -1 : 1
-        // )
-        .map(note => {
-          const { x, y } = note;
-          const element = elementsMap.get(`${(x + pagination) % mod}:${y}`);
+      const sheetArr = Object.values(sheet).map(note => {
+        const { x, y } = note;
+        const element = elementsMap.get(`${(x + pagination) % mod}:${y}`);
 
-          if (element) {
-            element.style.opacity = '0.1';
-            element.firstChild.style.transform = `scale(1)`;
-          }
-          localMax = Math.max(localMax, x);
-          return { note, element, index: x };
-        });
+        if (element) {
+          element.style.opacity = '0.1';
+          element.firstChild.style.transform = `scale(1)`;
+        }
+        localMax = Math.max(localMax, x);
+        return { note, element, index: x };
+      });
 
       for (let i = 0; i < localMax; i++) {
         if (!sheetArr[i]) {
@@ -418,7 +413,7 @@ const Matrix = () => {
             className="ui"
             onChange={e => {
               setOffset(+e.currentTarget.value);
-              offsetNotes(e);
+              offsetNotes(+e.currentTarget.value);
             }}
             value={offset}
             type="number"
