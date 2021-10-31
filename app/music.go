@@ -30,8 +30,8 @@ GET/PIECE * :: { req, res } ->
 	PIECE[response] :: { res, result } -> res.status(200).send(result)
 
 DELETE/REMOVE :: { req, res } -> 
-	{ title, sheet, speed, offset } := req.body;
-	<- { title, sheet, res, username: req.user.username, speed, offset }
+	{ title } := req.body;
+	<- { title, res, username: req.user.username }
 	MONGO_REMOVE_PIECE :: { title, username, res } -> 
 			name := username + "'s " + title.trim()
 			query := { title: name }
@@ -40,12 +40,12 @@ DELETE/REMOVE :: { req, res } ->
 		REMOVE_PIECE :: { res } -> res.status(201).send({ success: 1 })
 
 POST/INSERT :: 	{ req, res } -> 
-			{ title, sheet, speed, offset } := req.body;
-			<- { title:title?.trim() || new Date().getTime(), sheet, res, username: req.user.username, speed, offset }
-	CREATE_PIECE :: { title, sheet, username, res, speed, offset } -> 
+			{ title, sheet, speed, offset, shift } := req.body;
+			<- { title:title?.trim() || new Date().getTime(), sheet, res, username: req.user.username, speed, offset, shift }
+	CREATE_PIECE :: { title, sheet, username, res, speed, offset, shift } -> 
 			name := username + "'s " + title
 			query := { title: name }
-			update := { $set: { title: name, username, speed, offset, sheet }}
+			update := { $set: { title: name, username, speed, offset, shift, sheet }}
 			options := { upsert: true }
 			<- { query, update, options, res }
 		MONGO_CREATE_PIECE * :: { res, query, update, options} -> { res, result: await MEMO.collections.music.findOneAndUpdate(query, update, options) }

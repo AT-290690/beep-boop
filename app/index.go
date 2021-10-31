@@ -46,7 +46,16 @@ MODULES ! ->
 			BODY_PARSER :: { app } -> void app.use(bodyParser.json())
 			
 			HELMET :: { app } -> 
-				app.use(helmet(), helmet.contentSecurityPolicy({
+				app.use((req, res, next) => {
+					res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
+					res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD');
+					res.setHeader("Access-Control-Allow-Headers", "Access-Control-Allow-Headers, Origin,Accept, X-Requested-With, Content-Type, Authorization, Access-Control-Request-Method, Access-Control-Request-Headers");
+					res.setHeader('Access-Control-Allow-Credentials', true);
+					res.setHeader('Access-Control-Allow-Authorization', true);
+
+					next();
+			}, helmet(), helmet.contentSecurityPolicy({
+					accessControlAllowOrigin:'*',
 					directives: {
 						defaultSrc: ["'self'"],
 						connectSrc: ["'self'", 'https://*'],
@@ -62,6 +71,7 @@ MODULES ! ->
 							"'unsafe-eval'",
 							'http://cdnjs.cloudflare.com/',
 							'https://unpkg.com/',
+							'http://localhost:*'
 						],
 						objectSrc: ["'none'"],
 						imgSrc: ["'self'", 'data: *'],
@@ -88,7 +98,7 @@ MODULES ! ->
 				app.use(passport.initialize())
 				
 			STATIC :: { __dirname, app } -> 
-			app.use(express.static("app/public"))
+			app.use(express.static("app/build"))
 			<- { __dirname, app }
 
 				ROUTER ! :: { __dirname, app } -> 
