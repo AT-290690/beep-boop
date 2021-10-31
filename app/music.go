@@ -16,9 +16,26 @@ GET/BY_AUTHOR :: { req, res } ->
 				}
 			BY_AUTHOR[response] :: { res, result } -> result.length === 0 ? void ::go("BY_AUTHOR[parseQuery]")({ res, author: "default", page: 0, perPage: 10 }) : res.status(200).send(result)
 
+GET/AUTHORS :: { req, res } -> 
+	{ query: { page, perPage } } := req
+	<- { res, page, perPage }
+	AUTHORS[parseQuery] :: { res, page, perPage } -> { res, page: +page || 0, perPage: +perPage || 10 }
+		AUTHORS[fetchFromDB] * :: { res, page, perPage } -> { 
+					res, 
+					result: await (
+					MEMO.collections.users
+						.find()
+						.limit(perPage)
+						.skip(page * perPage)
+						.project({ _id: 0, password: 0 })
+						.toArray()
+						) 
+				}
+			AUTHORS[response] :: { res, result } -> res.status(200).send(result)
+			
 GET/PIECE * :: { req, res } -> 
-	result := await MEMO.collections.music
-	.findOne({ title: req.query.title })
+result := await MEMO.collections.music
+.findOne({ title: req.query.title })
 
 	if (!result) {
 		<- void ::arrows["SEND_ERROR"]({

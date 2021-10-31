@@ -139,6 +139,7 @@ MODULES ! ->
 					MUSIC :: { app, listen } -> listen 
 						("/MUSIC", "private")
 						("GET", "/BY_AUTHOR")
+						("GET", "/AUTHORS")
 						("GET", "/PIECE")
 						("POST", "/INSERT")
 						("DELETE", "/REMOVE")
