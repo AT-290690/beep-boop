@@ -1,5 +1,6 @@
 import * as Tone from 'tone'
 export const INACTIVE_OPACITY = '0.1'
+export const ACTIVE_OPACITY = '1'
 export const INITIAL_DELAY = 100
 export const SECOND = 1000
 export const getNoteId = (note) => `${note.x}:${note.y}`
@@ -37,19 +38,6 @@ export const clearAllTimeouts = () => {
   }
 }
 export const elementsMap = new Map()
-export const sounds = []
-for (let i = 0; i < 7; i++) {
-  const sound = document.getElementById(`switch${i}`)
-  sound.volume = 30 / 100
-  sounds.push(sound)
-}
-export const playSound = (index) => {
-  const sound = sounds[index]
-  if (sound) {
-    sound.currentTime = 0
-    sound.play()
-  }
-}
 export const AllNotes = [
   'A0',
   'B0',

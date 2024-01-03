@@ -1,5 +1,11 @@
 import React, { useState } from 'react'
-import { elementsMap, hashCode, INACTIVE_OPACITY, intToRGB } from './common'
+import {
+  ACTIVE_OPACITY,
+  INACTIVE_OPACITY,
+  elementsMap,
+  hashCode,
+  intToRGB,
+} from './common'
 
 const Note = ({ i, j, note, sound, sheet, mod, volume, speed }) => {
   const id = `${i}:${j}`
@@ -12,7 +18,9 @@ const Note = ({ i, j, note, sound, sheet, mod, volume, speed }) => {
   //   currentNote.delay > 0.1 ? currentNote.delay + 1 : 1
   // );
 
-  const [opacity, setOpacity] = useState(imported ? '1' : INACTIVE_OPACITY)
+  const [opacity, setOpacity] = useState(
+    imported ? ACTIVE_OPACITY : INACTIVE_OPACITY
+  )
   const [color] = useState('#' + intToRGB(hashCode(note + '1230')))
   if (imported) {
     sheet[id] = currentNote
@@ -22,7 +30,7 @@ const Note = ({ i, j, note, sound, sheet, mod, volume, speed }) => {
     <button
       style={{ opacity }}
       ref={(element) => {
-        if (i < mod) {
+        if (element !== null && i < mod) {
           elementsMap.set(id, element)
         }
       }}

@@ -1,14 +1,13 @@
 import {
-  playSound,
   elementsMap,
   AllNotes,
-  sounds,
   matrix,
   sound,
   clearAllTimeouts,
   INACTIVE_OPACITY,
   INITIAL_DELAY,
   SECOND,
+  ACTIVE_OPACITY,
 } from './common.js'
 import React, { useState, useEffect, useLayoutEffect } from 'react'
 import * as html2canvas from 'html2canvas'
@@ -59,10 +58,7 @@ const Matrix = () => {
 
   useEffect(() => setLoad(true), [reload])
 
-  const adjustVolume = (volume) => {
-    sounds.forEach((s) => (s.volume = volume / 100))
-    setVolume(volume)
-  }
+  const adjustVolume = (volume) => setVolume(volume)
 
   const addMusicFromList = (current) => {
     setLoad(false)
@@ -93,14 +89,12 @@ const Matrix = () => {
 
   const offsetNotes = (value) => {
     setLoad(false)
-    playSound(3)
     callibrateNotes(sheet)
     setReload(!reload)
   }
   const clearNotes = () => {
     clearAllTimeouts()
     setSheet({})
-    playSound(0)
     setPagination(0)
     setLoad(false)
     setReload(!reload)
@@ -134,7 +128,7 @@ const Matrix = () => {
             const { value, delay } = note
             sound.volume.value = volume - 30
             sound.triggerAttackRelease(value, Math.max(delay * speed, 0.1))
-            if (element) element.style.opacity = '1'
+            if (element) element.style.opacity = ACTIVE_OPACITY
             // element.firstChild.style.transform = `scale(1, ${
             //   delay > 0.1 ? delay + 1 : 1
             // })`
@@ -148,7 +142,7 @@ const Matrix = () => {
             }, (speed * delay + 1) * INITIAL_DELAY)
           }, speed * index * SECOND + INITIAL_DELAY * 2)
       )
-    }, INITIAL_DELAY)
+    }, INITIAL_DELAY * (pagination === 0 ? 1 : 5))
   }
 
   const play = () => {
@@ -175,16 +169,13 @@ const Matrix = () => {
             title="shift right"
             onClick={() => {
               setShift(shift + 1)
-              playSound(5)
             }}
           >
             {'>>'}
           </button>
           <input
             className="ui"
-            onChange={(e) => {
-              setShift(+e.target.value || 0)
-            }}
+            onChange={(e) => setShift(+e.target.value || 0)}
             title="shift"
             value={shift}
             min={-AllNotes.length}
@@ -198,10 +189,7 @@ const Matrix = () => {
           <button
             className="ui label"
             title="shift left"
-            onClick={() => {
-              setShift(shift - 1)
-              playSound(5)
-            }}
+            onClick={() => setShift(shift - 1)}
           >
             {'<<'}
           </button>
@@ -226,7 +214,7 @@ const Matrix = () => {
           <input
             className="ui"
             title="change speed"
-            onChange={(e) => playSound(5) || setSpeed(+e.target.value)}
+            onChange={(e) => setSpeed(+e.target.value)}
             step="0.1"
             type="number"
             style={{
@@ -243,7 +231,6 @@ const Matrix = () => {
               const amount = +e.target.value
               if (amount >= 0 && amount <= 100) {
                 adjustVolume(amount)
-                playSound(5)
               }
             }}
             title="volume"
@@ -259,7 +246,6 @@ const Matrix = () => {
           />
           <button
             onClick={() => {
-              playSound(1)
               setScreenshotIsShow(false)
               html2canvas(document.querySelector('.matrix'), {
                 backgroundColor: 'transparent',
@@ -277,7 +263,6 @@ const Matrix = () => {
                   handler.appendChild(canvas)
                 } else setScreenshotCanvas(screenshotCanvas)
                 setScreenshotIsShow(true)
-                playSound(3)
               })
             }}
             className="ui label"
@@ -297,10 +282,7 @@ const Matrix = () => {
             {'>'}
           </button>
           <button
-            onClick={() => {
-              editMode()
-              playSound(1)
-            }}
+            onClick={editMode}
             title="stop"
             className="ui"
             style={{
@@ -316,7 +298,6 @@ const Matrix = () => {
               setLoad(false)
               setPagination(pagination - size)
               setReload(!reload)
-              playSound(4)
             }}
             title="up"
             className="ui"
@@ -332,7 +313,6 @@ const Matrix = () => {
               setLoad(false)
               setPagination(size + pagination)
               setReload(!reload)
-              playSound(4)
             }}
             className="ui"
           >
@@ -344,11 +324,45 @@ const Matrix = () => {
           </button>
 
           <input
-            onKeyPress={(e) =>
-              e.key === 'Enter' && e.target.value.includes('sheet')
-                ? addMusicFromList(JSON.parse(e.target.value))
-                : null
-            }
+            onInput={(e) => {
+              if (e.target.value.includes('sheet'))
+                addMusicFromList(JSON.parse(e.target.value))
+            }}
+            onKeyPress={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              switch (e.key.toLowerCase()) {
+                case 'w':
+                  if (pagination <= 0) return
+                  setLoad(false)
+                  setPagination(pagination - size)
+                  setReload(!reload)
+                  break
+                case 's':
+                  setLoad(false)
+                  setPagination(size + pagination)
+                  setReload(!reload)
+                  break
+                case 'a':
+                  setShift(shift - 1)
+                  break
+                case 'd':
+                  setShift(shift + 1)
+                  break
+                case 'e':
+                  play()
+                  break
+                case 'q':
+                  editMode()
+                  break
+                case 'enter':
+                  if (e.target.value.includes('sheet'))
+                    addMusicFromList(JSON.parse(e.target.value))
+                  break
+                default:
+                  break
+              }
+            }}
             title="title"
             onChange={(e) => setCurrentMusic(e.target.value)}
             value={currentMusic}
