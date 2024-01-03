@@ -1,0 +1,21 @@
+{
+  "files": {
+    "main.css": "/static/css/main.80d8b440.chunk.css",
+    "main.js": "/static/js/main.ab5fe8b2.chunk.js",
+    "main.js.map": "/static/js/main.ab5fe8b2.chunk.js.map",
+    "runtime-main.js": "/static/js/runtime-main.aee6162c.js",
+    "runtime-main.js.map": "/static/js/runtime-main.aee6162c.js.map",
+    "static/js/2.62ee4fff.chunk.js": "/static/js/2.62ee4fff.chunk.js",
+    "static/js/2.62ee4fff.chunk.js.map": "/static/js/2.62ee4fff.chunk.js.map",
+    "index.html": "/index.html",
+    "static/css/main.80d8b440.chunk.css.map": "/static/css/main.80d8b440.chunk.css.map",
+    "static/js/2.62ee4fff.chunk.js.LICENSE.txt": "/static/js/2.62ee4fff.chunk.js.LICENSE.txt",
+    "static/media/App.css": "/static/media/hyper-light-drifter.ea437adb.ttf"
+  },
+  "entrypoints": [
+    "static/js/runtime-main.aee6162c.js",
+    "static/js/2.62ee4fff.chunk.js",
+    "static/css/main.80d8b440.chunk.css",
+    "static/js/main.ab5fe8b2.chunk.js"
+  ]
+}
