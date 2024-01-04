@@ -1,5 +1,5 @@
 import * as Tone from 'tone'
-export const INACTIVE_OPACITY = '0.1'
+export const INACTIVE_OPACITY = '0.2'
 export const ACTIVE_OPACITY = '1'
 export const INITIAL_DELAY = 100
 export const SECOND = 1000

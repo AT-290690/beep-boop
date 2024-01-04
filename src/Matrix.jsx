@@ -169,11 +169,12 @@ const Matrix = () => {
             setLoad(false)
             setPagination(0)
             setLoad(true)
-          }
-          playInterval()
+          } else playInterval()
           break
         case 'q':
-          editMode()
+          setLoad(false)
+          clearAllTimeouts()
+          setLoad(true)
           break
         // case 'enter':
         //   if (e.target.value.includes('sheet'))
@@ -319,8 +320,7 @@ const Matrix = () => {
                 setPagination(0)
                 setLoad(false)
                 setReload(!reload)
-              }
-              playInterval()
+              } else playInterval()
             }}
             title="play"
             className="ui"
