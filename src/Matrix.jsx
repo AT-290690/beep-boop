@@ -49,15 +49,6 @@ const Matrix = () => {
 
   const resize = useWindowSize({ w: width, h: mod })
 
-  useEffect(() => {
-    setLoad(false)
-    setWidth(resize.w)
-    setMod(resize.h)
-    setLoad(true)
-  }, [resize.w, resize.h])
-
-  useEffect(() => setLoad(true), [reload])
-
   const adjustVolume = (volume) => setVolume(volume)
 
   const addMusicFromList = (current) => {
@@ -145,20 +136,66 @@ const Matrix = () => {
     }, INITIAL_DELAY * (pagination === 0 ? 1 : 5))
   }
 
-  const play = () => {
-    if (pagination !== 0) {
-      setPagination(0)
-      setLoad(false)
-      setReload(!reload)
-    }
-    playInterval()
-  }
-
   const editMode = () => {
     setLoad(false)
     clearAllTimeouts()
     setReload(!reload)
   }
+
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      switch (e.key.toLowerCase()) {
+        case 'w':
+          if (pagination <= 0) return
+          setLoad(false)
+          setPagination(pagination - size)
+          setLoad(true)
+          break
+        case 's':
+          setLoad(false)
+          setPagination(size + pagination)
+          setLoad(true)
+          break
+        case 'a':
+          setShift(shift - 1)
+          break
+        case 'd':
+          setShift(shift + 1)
+          break
+        case 'e':
+          if (pagination !== 0) {
+            setLoad(false)
+            setPagination(0)
+            setLoad(true)
+          }
+          playInterval()
+          break
+        case 'q':
+          editMode()
+          break
+        // case 'enter':
+        //   if (e.target.value.includes('sheet'))
+        //     addMusicFromList(JSON.parse(e.target.value))
+        //   break
+        default:
+          break
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shift, pagination])
+
+  useEffect(() => {
+    setLoad(false)
+    setWidth(resize.w)
+    setMod(resize.h)
+    setLoad(true)
+  }, [resize.w, resize.h])
+
+  useEffect(() => setLoad(true), [reload])
 
   return (
     <div>
@@ -229,9 +266,7 @@ const Matrix = () => {
             className="ui"
             onChange={(e) => {
               const amount = +e.target.value
-              if (amount >= 0 && amount <= 100) {
-                adjustVolume(amount)
-              }
+              if (amount >= 0 && amount <= 100) adjustVolume(amount)
             }}
             title="volume"
             value={volume}
@@ -278,7 +313,18 @@ const Matrix = () => {
         </div>
 
         <div className="tools">
-          <button onClick={play} title="play" className="ui">
+          <button
+            onClick={() => {
+              if (pagination !== 0) {
+                setPagination(0)
+                setLoad(false)
+                setReload(!reload)
+              }
+              playInterval()
+            }}
+            title="play"
+            className="ui"
+          >
             {'>'}
           </button>
           <button
@@ -324,47 +370,13 @@ const Matrix = () => {
           </button>
 
           <input
-            onInput={(e) => {
-              if (e.target.value.includes('sheet'))
+            title="title"
+            onChange={(e) => {
+              if (e.target.value.includes('sheet')) {
+                setCurrentMusic(e.target.value)
                 addMusicFromList(JSON.parse(e.target.value))
-            }}
-            onKeyPress={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              switch (e.key.toLowerCase()) {
-                case 'w':
-                  if (pagination <= 0) return
-                  setLoad(false)
-                  setPagination(pagination - size)
-                  setReload(!reload)
-                  break
-                case 's':
-                  setLoad(false)
-                  setPagination(size + pagination)
-                  setReload(!reload)
-                  break
-                case 'a':
-                  setShift(shift - 1)
-                  break
-                case 'd':
-                  setShift(shift + 1)
-                  break
-                case 'e':
-                  play()
-                  break
-                case 'q':
-                  editMode()
-                  break
-                case 'enter':
-                  if (e.target.value.includes('sheet'))
-                    addMusicFromList(JSON.parse(e.target.value))
-                  break
-                default:
-                  break
               }
             }}
-            title="title"
-            onChange={(e) => setCurrentMusic(e.target.value)}
             value={currentMusic}
             className="ui title"
           />

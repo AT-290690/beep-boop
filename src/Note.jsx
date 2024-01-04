@@ -30,9 +30,7 @@ const Note = ({ i, j, note, sound, sheet, mod, volume, speed }) => {
     <button
       style={{ opacity }}
       ref={(element) => {
-        if (element !== null && i < mod) {
-          elementsMap.set(id, element)
-        }
+        if (element !== null && i < mod) elementsMap.set(id, element)
       }}
       className="note-button"
       id={id}
