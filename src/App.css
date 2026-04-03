@@ -16,6 +16,7 @@ body {
 }
 
 input,
+select,
 textarea,
 button {
   -webkit-user-select: none;
@@ -175,13 +176,31 @@ button {
 
 .shape {
   transform-origin: top;
-
-  /* transition: all 100ms ease-in-out; */
-  /* font-family: 'Hyper-Light-Drifter'; */
   height: 20px;
   width: 20px;
   text-align: center;
-  /* border-radius: 50%; */
+}
+
+.shape-playing {
+  animation: note-pulse 240ms ease-out;
+  box-shadow:
+    0 0 8px rgba(255, 255, 255, 0.7),
+    0 0 18px currentColor;
+}
+
+@keyframes note-pulse {
+  0% {
+    transform: scale(0.92);
+    filter: brightness(1);
+  }
+  40% {
+    transform: scale(1.18);
+    filter: brightness(1.35);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
 }
 input {
   padding-left: 10px;
@@ -195,6 +214,13 @@ input {
 
 .speed-input {
   width: 80px;
+}
+
+.toolbar-select {
+  width: 96px;
+  font-size: 10px;
+  text-align: center;
+  padding: 0 8px;
 }
 
 textarea {

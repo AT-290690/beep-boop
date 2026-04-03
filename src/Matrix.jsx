@@ -1,20 +1,20 @@
 import {
-  elementsMap,
   AllNotes,
   matrix,
   sound,
   ensureAudioStarted,
   clearAllTimeouts,
+  DEFAULT_SYNTH_PRESET,
   getNoteId,
   getNoteValue,
-  INACTIVE_OPACITY,
   INITIAL_DELAY,
   NOTE_DURATION,
   SECOND,
-  ACTIVE_OPACITY,
   normalizeSong,
+  setSynthPreset,
   serializeSong,
   sortNotes,
+  SYNTH_PRESET_OPTIONS,
 } from './common.js'
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import Note from './Note.jsx'
@@ -40,7 +40,6 @@ const Matrix = () => {
   const [width, setWidth] = useState(30)
   const [offset, setOffset] = useState(15)
   const [shift, setShift] = useState(0)
-  const [volume, setVolume] = useState(30)
   const [Notes] = useState(AllNotes) //.slice(shift, offset + width)
   const [speed, setSpeed] = useState(0.25)
   const [pagination, setPagination] = useState(0)
@@ -50,15 +49,20 @@ const Matrix = () => {
   const [load, setLoad] = useState(false)
   const [currentMusic, setCurrentMusic] = useState('')
   const [isSongModalOpen, setIsSongModalOpen] = useState(false)
+  const [synthPreset, setSynthPresetState] = useState(DEFAULT_SYNTH_PRESET)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [playingNoteIds, setPlayingNoteIds] = useState([])
 
   const resize = useWindowSize({ w: width, h: mod })
   const horizontalScrollRemainder = useRef(0)
+  const verticalScrollRemainder = useRef(0)
+  const playbackStartRef = useRef(0)
+  const isPlayingRef = useRef(false)
+  const playingNoteIdsSet = new Set(playingNoteIds)
   const notesById = notes.reduce((acc, note) => {
     acc[getNoteId(note)] = note
     return acc
   }, {})
-
-  const adjustVolume = (volume) => setVolume(volume)
 
   const addMusicFromList = (current) => {
     const nextSong = normalizeSong(current)
@@ -66,6 +70,7 @@ const Matrix = () => {
     setSpeed(nextSong.speed)
     setOffset(nextSong.offset)
     setShift(nextSong.shift)
+    setSynthPresetState(nextSong.synth)
     setNotes(nextSong.notes)
     setIsSongModalOpen(false)
     callibrateNotes(nextSong.notes)
@@ -93,6 +98,7 @@ const Matrix = () => {
   }
   const clearNotes = () => {
     clearAllTimeouts()
+    setPlayingNoteIds([])
     setNotes([])
     setPagination(0)
     setLoad(false)
@@ -101,28 +107,58 @@ const Matrix = () => {
     history.replaceState({}, null, '/')
   }
 
-  const handleMatrixWheel = (e) => {
-    const horizontalDelta =
-      Math.abs(e.deltaX) >= Math.abs(e.deltaY)
-        ? e.deltaX
-        : e.shiftKey
-          ? e.deltaY
-          : 0
+  const scrollPitchBy = (amount) => {
+    if (!amount) return
+    setShift((current) => current + amount)
+  }
 
-    if (!horizontalDelta) return
+  const scrollTimeBy = (amount) => {
+    if (!amount) return
+    setLoad(false)
+    setPagination((current) => current + amount)
+    setLoad(true)
+  }
+
+  const handleMatrixWheel = (e) => {
+    const horizontalDelta = e.deltaX || (e.shiftKey ? e.deltaY : 0)
+    const verticalDelta = e.shiftKey && !e.deltaX ? 0 : e.deltaY
+
+    if (!horizontalDelta && !verticalDelta) return
 
     e.preventDefault()
-    horizontalScrollRemainder.current += horizontalDelta
-    const stepSize = 32
-    const steps = Math.trunc(horizontalScrollRemainder.current / stepSize)
-    if (!steps) return
 
-    setShift((current) => current + steps)
-    horizontalScrollRemainder.current -= steps * stepSize
+    if (horizontalDelta) {
+      horizontalScrollRemainder.current += horizontalDelta
+      const horizontalSteps = Math.trunc(horizontalScrollRemainder.current / 32)
+      if (horizontalSteps) {
+        scrollPitchBy(horizontalSteps)
+        horizontalScrollRemainder.current -= horizontalSteps * 32
+      }
+    }
+
+    if (verticalDelta) {
+      verticalScrollRemainder.current += verticalDelta
+      const verticalSteps = Math.trunc(verticalScrollRemainder.current / 32)
+      if (verticalSteps) {
+        scrollTimeBy(verticalSteps)
+        verticalScrollRemainder.current -= verticalSteps * 32
+      }
+    }
+  }
+
+  const revealPlaybackRow = (row) => {
+    const followOffset = 1
+    setPagination(row - followOffset)
+  }
+
+  const finishPlayback = () => {
+    isPlayingRef.current = false
+    setIsPlaying(false)
+    setPlayingNoteIds([])
   }
 
   const toggleNote = async ({ x, y, noteValue }) => {
-    if (!noteValue) return
+    if (!noteValue || x < 0) return
     const id = getNoteId({ x, y })
     if (notesById[id]) {
       setNotes((current) => current.filter((note) => getNoteId(note) !== id))
@@ -130,68 +166,114 @@ const Matrix = () => {
     }
 
     await ensureAudioStarted()
-    sound.volume.value = volume - 30
+    sound.volume.value = -10
     sound.triggerAttackRelease(noteValue, NOTE_DURATION * speed)
     setNotes((current) => sortNotes([...current, { x, y }]))
   }
 
-  const playInterval = () => {
+  const playInterval = (startX = playbackStartRef.current) => {
+    if (!isPlayingRef.current) return
     setTimeout(() => {
+      if (!isPlayingRef.current) return
       if (size !== mod) setSize(mod)
       clearAllTimeouts()
-      const localMax = notes.reduce((max, note) => Math.max(max, note.x), -1)
+      const scheduledNotes = notes.filter((note) => note.x >= startX)
+      const localMax = scheduledNotes.reduce((max, note) => Math.max(max, note.x), -1)
+      const postRollRows = 3
+      const endRow = localMax + postRollRows
 
-      notes.forEach((note) => {
+      if (localMax < startX) {
+        finishPlayback()
+        return
+      }
+
+      for (let row = startX; row <= endRow; row++) {
+        setTimeout(() => {
+          if (!isPlayingRef.current) return
+          revealPlaybackRow(row)
+        }, speed * (row - startX) * SECOND)
+      }
+
+      scheduledNotes.forEach((note) => {
         const { x, y } = note
-        const element = elementsMap.get(`${(x + pagination) % mod}:${y}`)
+        const noteId = getNoteId(note)
         const value = getNoteValue(y, offset)
-        if (element) {
-          element.style.opacity = INACTIVE_OPACITY
-          element.firstChild.style.transform = `scale(1)`
-        }
         if (!value) return
 
         setTimeout(() => {
-          sound.volume.value = volume - 30
-          sound.triggerAttackRelease(value, Math.max(NOTE_DURATION * speed, 0.1))
-          if (element) element.style.opacity = ACTIVE_OPACITY
+          if (!isPlayingRef.current) return
+          sound.volume.value = -10
+          sound.triggerAttackRelease(
+            value,
+            Math.max(NOTE_DURATION * speed, 0.1)
+          )
+          setPlayingNoteIds((current) =>
+            current.includes(noteId) ? current : [...current, noteId]
+          )
           setTimeout(() => {
-            if (element)
-              setTimeout(() => {
-                element.style.opacity = INACTIVE_OPACITY
-                element.firstChild.style.transform = `scale(1)`
-              }, (speed * NOTE_DURATION + 1) * INITIAL_DELAY + INITIAL_DELAY)
-          }, (speed * NOTE_DURATION + 1) * INITIAL_DELAY)
-        }, speed * x * SECOND + INITIAL_DELAY * 2)
+            setPlayingNoteIds((current) =>
+              current.filter((currentNoteId) => currentNoteId !== noteId)
+            )
+          }, Math.max(speed * SECOND * 0.8, 120))
+        }, speed * (x - startX) * SECOND + INITIAL_DELAY * 2)
       })
 
-      if (localMax >= 0) {
-        setTimeout(
-          () => playInterval(),
-          speed * localMax * SECOND +
-            (speed * NOTE_DURATION + 1) * INITIAL_DELAY +
-            SECOND +
-            INITIAL_DELAY * 2
-        )
-      }
-    }, INITIAL_DELAY * (pagination === 0 ? 1 : 5))
+      setTimeout(() => {
+        if (!isPlayingRef.current) return
+        finishPlayback()
+      }, speed * (endRow - startX) * SECOND + INITIAL_DELAY * 2)
+    }, INITIAL_DELAY)
   }
 
   const editMode = () => {
+    isPlayingRef.current = false
+    setIsPlaying(false)
+    setPlayingNoteIds([])
     setLoad(false)
     clearAllTimeouts()
     setReload((current) => !current)
   }
 
+  const startPlayback = async () => {
+    await ensureAudioStarted()
+    playbackStartRef.current = pagination
+    isPlayingRef.current = true
+    setIsPlaying(true)
+    playInterval(playbackStartRef.current)
+  }
+
+  const togglePlayback = async () => {
+    if (isPlayingRef.current) {
+      editMode()
+      return
+    }
+    await startPlayback()
+  }
+
+  const copySongToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(currentMusic)
+    } catch (_) {
+      // Ignore clipboard errors for now; the song text remains visible in the modal.
+    }
+  }
+
   useEffect(() => {
-    setCurrentMusic(serializeSong({ notes, offset, speed, shift }))
-  }, [notes, offset, speed, shift])
+    setCurrentMusic(
+      serializeSong({ notes, offset, speed, shift, synth: synthPreset })
+    )
+  }, [notes, offset, speed, shift, synthPreset])
+
+  useEffect(() => {
+    setSynthPreset(synthPreset)
+  }, [synthPreset])
 
   useEffect(() => {
     const onKeyDown = async (e) => {
       const tagName = e.target.tagName
       if (
         tagName === 'INPUT' ||
+        tagName === 'SELECT' ||
         tagName === 'TEXTAREA' ||
         e.target.isContentEditable
       )
@@ -201,35 +283,28 @@ const Matrix = () => {
       e.stopPropagation()
       switch (e.key.toLowerCase()) {
         case 'w':
-          if (pagination <= 0) return
-          setLoad(false)
-          setPagination(pagination - size)
-          setLoad(true)
+          scrollTimeBy(-1)
           break
         case 's':
-          setLoad(false)
-          setPagination(size + pagination)
-          setLoad(true)
+          scrollTimeBy(1)
           break
         case 'a':
-          setShift(shift - 1)
+          scrollPitchBy(-1)
           break
         case 'd':
-          setShift(shift + 1)
+          scrollPitchBy(1)
           break
         case 'e':
-          if (pagination !== 0) {
-            setLoad(false)
-            setPagination(0)
-            setLoad(true)
-          } else {
-            await ensureAudioStarted()
-            playInterval()
-          }
+          await startPlayback()
+          break
+        case ' ':
+          await togglePlayback()
           break
         case 'q':
           setLoad(false)
           clearAllTimeouts()
+          isPlayingRef.current = false
+          setIsPlaying(false)
           setLoad(true)
           break
         case 'escape':
@@ -245,7 +320,7 @@ const Matrix = () => {
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [mod, notes, offset, pagination, shift, size, speed, volume])
+  }, [mod, notes, offset, pagination, speed])
 
   useEffect(() => {
     setLoad(false)
@@ -260,60 +335,9 @@ const Matrix = () => {
     <div>
       <div className={`options  ${isSongModalOpen ? 'blured' : ''}`}>
         <div className="toolbar">
-          <button
-            onClick={async () => {
-              if (pagination !== 0) {
-                setPagination(0)
-                setLoad(false)
-                setReload((current) => !current)
-              } else {
-                await ensureAudioStarted()
-                playInterval()
-              }
-            }}
-            title="play"
-            className="ui"
-          >
-            {'>'}
+          <button onClick={togglePlayback} title="play" className="ui">
+            {isPlaying ? '||' : '>'}
           </button>
-          <button
-            onClick={editMode}
-            title="stop"
-            className="ui"
-            style={{
-              fontSize: 20,
-            }}
-          >
-            #
-          </button>
-
-          <button
-            onClick={() => {
-              if (pagination <= 0) return
-              setLoad(false)
-              setPagination(pagination - size)
-              setReload((current) => !current)
-            }}
-            title="up"
-            className="ui"
-          >
-            &#9650;
-          </button>
-          <button title="page" className="ui">
-            {pagination / size}
-          </button>
-          <button
-            title="down"
-            onClick={(e) => {
-              setLoad(false)
-              setPagination(size + pagination)
-              setReload((current) => !current)
-            }}
-            className="ui"
-          >
-            &#9660;
-          </button>
-
           <button title="erase" className="ui" onClick={() => clearNotes()}>
             x
           </button>
@@ -339,18 +363,18 @@ const Matrix = () => {
             type="number"
             value={speed}
           />
-          <input
-            className="ui toolbar-input"
-            onChange={(e) => {
-              const amount = +e.target.value
-              if (amount >= 0 && amount <= 100) adjustVolume(amount)
-            }}
-            title="volume"
-            value={volume}
-            type="number"
-            min={0}
-            max={100}
-          />
+          <select
+            title="synth"
+            className="ui toolbar-select"
+            value={synthPreset}
+            onChange={(e) => setSynthPresetState(e.target.value)}
+          >
+            {SYNTH_PRESET_OPTIONS.map(({ id, label }) => (
+              <option key={id} value={id}>
+                {label}
+              </option>
+            ))}
+          </select>
           <button
             title="song json"
             className="ui label"
@@ -374,6 +398,13 @@ const Matrix = () => {
             aria-label="Song JSON"
           >
             <div className="modal-header">
+              <button
+                title="copy song json"
+                className="ui label"
+                onClick={copySongToClipboard}
+              >
+                copy
+              </button>
               <button
                 title="close song modal"
                 className="ui label"
@@ -425,12 +456,17 @@ const Matrix = () => {
                   y={j - shift}
                   key={i + '-' + (j - shift)}
                   noteValue={Notes[j - shift + offset]}
+                  isPlaying={playingNoteIdsSet.has(
+                    `${i + pagination}:${j - shift}`
+                  )}
                   currentNote={{
                     ...(notesById[`${i + pagination}:${j - shift}`] || {
                       x: i + pagination,
                       y: j - shift,
                     }),
-                    active: Boolean(notesById[`${i + pagination}:${j - shift}`]),
+                    active: Boolean(
+                      notesById[`${i + pagination}:${j - shift}`]
+                    ),
                   }}
                   mod={mod}
                   onToggle={toggleNote}

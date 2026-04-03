@@ -1,20 +1,12 @@
 import React from 'react'
-import {
-  ACTIVE_OPACITY,
-  INACTIVE_OPACITY,
-  elementsMap,
-  getBrightColor,
-} from './common'
+import { getBrightColor } from './common'
 
-const Note = ({ x, y, noteValue, currentNote, mod, onToggle }) => {
-  const opacity = currentNote.active ? ACTIVE_OPACITY : INACTIVE_OPACITY
+const Note = ({ x, y, noteValue, currentNote, isPlaying, mod, onToggle }) => {
+  const opacity = currentNote.active ? '1' : '0.14'
   const color = getBrightColor(`${noteValue || 'rest'}1230`)
   return (
     <button
       style={{ opacity }}
-      ref={(element) => {
-        if (element !== null && x < mod) elementsMap.set(`${x}:${y}`, element)
-      }}
       className="note-button"
       id={`${x}:${y}`}
       title={noteValue}
@@ -23,8 +15,9 @@ const Note = ({ x, y, noteValue, currentNote, mod, onToggle }) => {
       <div
         style={{
           backgroundColor: color,
+          color,
         }}
-        className="shape"
+        className={`shape${isPlaying ? ' shape-playing' : ''}`}
       ></div>
     </button>
   )

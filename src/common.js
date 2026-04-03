@@ -4,6 +4,7 @@ export const ACTIVE_OPACITY = '1'
 export const INITIAL_DELAY = 100
 export const SECOND = 1000
 export const NOTE_DURATION = 0.1
+export const DEFAULT_SYNTH_PRESET = 'classic'
 let startAudioPromise = null
 export const getNoteId = (note) => `${note.x}:${note.y}`
 export const sortNotes = (notes) =>
@@ -37,17 +38,201 @@ export const matrix = (x, y, v) =>
     .fill(v)
     .map((_) => Array(y).fill(v))
 
-export const sound = new Tone.PolySynth(Tone.Synth, {
-  envelope: {
-    releaseCurve: 'sine',
-  },
-})
-  // .connect(new Tone.AutoPanner('8n').toDestination())
-  // .connect(new Tone.Distortion(2.8).toDestination())
-  // .connect(new Tone.Chorus(4, 3.5, 0.5).toDestination())
-  // .connect(new Tone.Tremolo(9, 0.75).toDestination())
-  // .connect(new Tone.Vibrato(9, 0.75).toDestination())
-  .toDestination()
+export const SYNTH_PRESET_OPTIONS = [
+  { id: 'classic', label: 'Classic' },
+  { id: 'echo', label: 'Echo' },
+  { id: 'orbit', label: 'Orbit' },
+  { id: 'glass', label: 'Glass' },
+  { id: 'pulse', label: 'Pulse' },
+  { id: 'warm', label: 'Warm' },
+]
+const isValidSynthPreset = (presetId) =>
+  SYNTH_PRESET_OPTIONS.some(({ id }) => id === presetId)
+const resolveSynthPreset = (presetId) =>
+  isValidSynthPreset(presetId) ? presetId : DEFAULT_SYNTH_PRESET
+let activeSoundNodes = []
+const disposeActiveSoundNodes = () => {
+  activeSoundNodes.forEach((node) => {
+    if (node && typeof node.dispose === 'function') node.dispose()
+  })
+  activeSoundNodes = []
+}
+const createSoundRig = (presetId) => {
+  switch (resolveSynthPreset(presetId)) {
+    case 'orbit': {
+      const synth = new Tone.PolySynth(Tone.DuoSynth, {
+        harmonicity: 1.5,
+        vibratoAmount: 0.12,
+        vibratoRate: 4.5,
+        voice0: {
+          oscillator: {
+            type: 'triangle',
+          },
+          envelope: {
+            attack: 0.01,
+            decay: 0.08,
+            sustain: 0.35,
+            release: 1.6,
+          },
+        },
+        voice1: {
+          oscillator: {
+            type: 'triangle',
+          },
+          envelope: {
+            attack: 0.02,
+            decay: 0.1,
+            sustain: 0.25,
+            release: 2.2,
+          },
+        },
+      })
+      const filter = new Tone.Filter({
+        type: 'lowpass',
+        frequency: 2600,
+        rolloff: -12,
+      })
+      const delay = new Tone.PingPongDelay({
+        delayTime: '8n',
+        feedback: 0.48,
+        wet: 0.58,
+      })
+      const limiter = new Tone.Limiter(-8).toDestination()
+      synth.connect(filter)
+      filter.connect(delay)
+      delay.connect(limiter)
+      return {
+        sound: synth,
+        nodes: [synth, filter, delay, limiter],
+      }
+    }
+    case 'echo': {
+      const synth = new Tone.PolySynth(Tone.Synth, {
+        oscillator: {
+          type: 'triangle',
+        },
+        envelope: {
+          attack: 0.01,
+          decay: 0.12,
+          sustain: 0.25,
+          release: 1.4,
+          releaseCurve: 'sine',
+        },
+      })
+      const tremolo = new Tone.Tremolo({
+        frequency: 4.5,
+        depth: 0.2,
+        spread: 180,
+      }).start()
+      const delay = new Tone.PingPongDelay({
+        delayTime: '8n',
+        feedback: 0.35,
+        wet: 0.45,
+      })
+      const limiter = new Tone.Limiter(-8).toDestination()
+      synth.connect(tremolo)
+      tremolo.connect(delay)
+      delay.connect(limiter)
+      return {
+        sound: synth,
+        nodes: [synth, tremolo, delay, limiter],
+      }
+    }
+    case 'glass':
+      return {
+        sound: new Tone.PolySynth(Tone.FMSynth, {
+        harmonicity: 3,
+        modulationIndex: 8,
+        envelope: {
+          attack: 0.01,
+          decay: 0.2,
+          sustain: 0.15,
+          release: 1.5,
+        },
+        modulation: {
+          type: 'triangle',
+        },
+        modulationEnvelope: {
+          attack: 0.05,
+          decay: 0.3,
+          sustain: 0.05,
+          release: 1.2,
+        },
+      }).toDestination(),
+        nodes: [],
+      }
+    case 'pulse':
+      return {
+        sound: new Tone.PolySynth(Tone.Synth, {
+        oscillator: {
+          type: 'square8',
+        },
+        envelope: {
+          attack: 0.005,
+          decay: 0.08,
+          sustain: 0.2,
+          release: 0.6,
+          releaseCurve: 'sine',
+        },
+      }).toDestination(),
+        nodes: [],
+      }
+    case 'warm':
+      return {
+        sound: new Tone.PolySynth(Tone.AMSynth, {
+        harmonicity: 1.5,
+        envelope: {
+          attack: 0.02,
+          decay: 0.2,
+          sustain: 0.45,
+          release: 1.1,
+        },
+        modulation: {
+          type: 'sine',
+        },
+        modulationEnvelope: {
+          attack: 0.1,
+          decay: 0.2,
+          sustain: 0.3,
+          release: 0.8,
+        },
+      }).toDestination(),
+        nodes: [],
+      }
+    case 'classic':
+    default:
+      return {
+        sound: new Tone.PolySynth(Tone.Synth, {
+        oscillator: {
+          type: 'triangle',
+        },
+        envelope: {
+          attack: 0.01,
+          decay: 0.12,
+          sustain: 0.3,
+          release: 0.8,
+          releaseCurve: 'sine',
+        },
+      }).toDestination(),
+        nodes: [],
+      }
+  }
+}
+const initializeSound = (presetId) => {
+  disposeActiveSoundNodes()
+  const { sound, nodes } = createSoundRig(presetId)
+  activeSoundNodes = nodes.length ? nodes : [sound]
+  return sound
+}
+export let sound = initializeSound(DEFAULT_SYNTH_PRESET)
+export const setSynthPreset = (presetId) => {
+  const nextPreset = resolveSynthPreset(presetId)
+  if (sound) {
+    if (typeof sound.releaseAll === 'function') sound.releaseAll()
+  }
+  sound = initializeSound(nextPreset)
+  return nextPreset
+}
 Tone.context.lookAhead = 0.2
 export const ensureAudioStarted = () => {
   if (!startAudioPromise) {
@@ -55,26 +240,52 @@ export const ensureAudioStarted = () => {
   }
   return startAudioPromise
 }
+const normalizeNote = (note) => {
+  if (Array.isArray(note)) {
+    const [x, y] = note
+    return {
+      x: Number(x),
+      y: Number(y),
+    }
+  }
+
+  if (note && typeof note === 'object') {
+    const { x, y } = note
+    return {
+      x: Number(x),
+      y: Number(y),
+    }
+  }
+
+  return {
+    x: Number.NaN,
+    y: Number.NaN,
+  }
+}
 export const normalizeNotes = (notes = []) =>
   sortNotes(
     Array.from(
       notes
-        .map(({ x, y }) => ({
-          x: Number(x),
-          y: Number(y),
-        }))
+        .map(normalizeNote)
         .filter(({ x, y }) => Number.isFinite(x) && Number.isFinite(y))
         .reduce((acc, note) => acc.set(getNoteId(note), note), new Map())
         .values()
     )
   )
 export const normalizeSong = (song = {}) => {
-  const fallback = { notes: [], offset: 15, speed: 0.25, shift: 0 }
+  const fallback = {
+    notes: [],
+    offset: 15,
+    speed: 0.25,
+    shift: 0,
+    synth: DEFAULT_SYNTH_PRESET,
+  }
   if (!song || typeof song !== 'object') return fallback
 
   const nextOffset = Number(song.offset)
   const nextSpeed = Number(song.speed)
   const nextShift = Number(song.shift)
+  const nextSynth = resolveSynthPreset(song.synth)
 
   if (Array.isArray(song.notes)) {
     return {
@@ -82,6 +293,7 @@ export const normalizeSong = (song = {}) => {
       offset: Number.isFinite(nextOffset) ? nextOffset : fallback.offset,
       speed: Number.isFinite(nextSpeed) ? nextSpeed : fallback.speed,
       shift: Number.isFinite(nextShift) ? nextShift : fallback.shift,
+      synth: nextSynth,
     }
   }
 
@@ -91,18 +303,20 @@ export const normalizeSong = (song = {}) => {
       offset: Number.isFinite(nextOffset) ? nextOffset : fallback.offset,
       speed: Number.isFinite(nextSpeed) ? nextSpeed : fallback.speed,
       shift: Number.isFinite(nextShift) ? nextShift : fallback.shift,
+      synth: nextSynth,
     }
   }
 
   return fallback
 }
-export const serializeSong = ({ notes, offset, speed, shift }) =>
+export const serializeSong = ({ notes, offset, speed, shift, synth }) =>
   JSON.stringify(
     {
-      notes: normalizeNotes(notes).map(({ x, y }) => ({ x, y })),
+      notes: normalizeNotes(notes).map(({ x, y }) => [x, y]),
       offset,
       speed,
       shift,
+      synth: resolveSynthPreset(synth),
     },
     null,
     2
@@ -114,7 +328,6 @@ export const clearAllTimeouts = () => {
     window.clearTimeout(id)
   }
 }
-export const elementsMap = new Map()
 export const AllNotes = [
   'A0',
   'B0',
