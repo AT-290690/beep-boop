@@ -3,6 +3,7 @@ import {
   AllNotes,
   matrix,
   sound,
+  ensureAudioStarted,
   clearAllTimeouts,
   INACTIVE_OPACITY,
   INITIAL_DELAY,
@@ -10,7 +11,7 @@ import {
   ACTIVE_OPACITY,
 } from './common.js'
 import React, { useState, useEffect, useLayoutEffect } from 'react'
-import * as html2canvas from 'html2canvas'
+import html2canvas from 'html2canvas'
 import Note from './Note.jsx'
 
 const useWindowSize = (initial) => {
@@ -143,7 +144,7 @@ const Matrix = () => {
   }
 
   useEffect(() => {
-    const onKeyDown = (e) => {
+    const onKeyDown = async (e) => {
       e.preventDefault()
       e.stopPropagation()
       switch (e.key.toLowerCase()) {
@@ -169,7 +170,10 @@ const Matrix = () => {
             setLoad(false)
             setPagination(0)
             setLoad(true)
-          } else playInterval()
+          } else {
+            await ensureAudioStarted()
+            playInterval()
+          }
           break
         case 'q':
           setLoad(false)
@@ -315,12 +319,15 @@ const Matrix = () => {
 
         <div className="tools">
           <button
-            onClick={() => {
+            onClick={async () => {
               if (pagination !== 0) {
                 setPagination(0)
                 setLoad(false)
                 setReload(!reload)
-              } else playInterval()
+              } else {
+                await ensureAudioStarted()
+                playInterval()
+              }
             }}
             title="play"
             className="ui"

@@ -7,4 +7,5 @@ const App = () => (
     <Matrix />
   </div>
 )
+
 export default App

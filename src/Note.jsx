@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import {
   ACTIVE_OPACITY,
   INACTIVE_OPACITY,
+  ensureAudioStarted,
   elementsMap,
   hashCode,
   intToRGB,
@@ -44,12 +45,13 @@ const Note = ({ i, j, note, sound, sheet, mod, volume, speed }) => {
       //     setSize(delay + 1);
       //   }
       // }}
-      onClick={() => {
+      onClick={async () => {
         const id = `${i}:${j}`
         if (sheet[id]) {
           setOpacity(INACTIVE_OPACITY)
           delete sheet[id]
         } else {
+          await ensureAudioStarted()
           setOpacity('1')
           sound.volume.value = volume - 30
           sound.triggerAttackRelease(note, delay * speed)

@@ -3,6 +3,7 @@ export const INACTIVE_OPACITY = '0.2'
 export const ACTIVE_OPACITY = '1'
 export const INITIAL_DELAY = 100
 export const SECOND = 1000
+let startAudioPromise = null
 export const getNoteId = (note) => `${note.x}:${note.y}`
 export const hashCode = (str) => {
   let hash = 0
@@ -31,6 +32,12 @@ export const sound = new Tone.PolySynth(Tone.Synth, {
   // .connect(new Tone.Vibrato(9, 0.75).toDestination())
   .toDestination()
 Tone.context.lookAhead = 0.2
+export const ensureAudioStarted = () => {
+  if (!startAudioPromise) {
+    startAudioPromise = Tone.start()
+  }
+  return startAudioPromise
+}
 export const clearAllTimeouts = () => {
   let id = window.setTimeout(() => {}, 0)
   while (id--) {
