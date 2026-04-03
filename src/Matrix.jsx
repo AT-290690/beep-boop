@@ -16,8 +16,7 @@ import {
   serializeSong,
   sortNotes,
 } from './common.js'
-import React, { useState, useEffect, useLayoutEffect } from 'react'
-import html2canvas from 'html2canvas'
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import Note from './Note.jsx'
 
 const useWindowSize = (initial) => {
@@ -51,10 +50,9 @@ const Matrix = () => {
   const [load, setLoad] = useState(false)
   const [currentMusic, setCurrentMusic] = useState('')
   const [isSongModalOpen, setIsSongModalOpen] = useState(false)
-  const [screenshotCanvas, setScreenshotCanvas] = useState()
-  const [isScreenshotShown, setScreenshotIsShow] = useState(false)
 
   const resize = useWindowSize({ w: width, h: mod })
+  const horizontalScrollRemainder = useRef(0)
   const notesById = notes.reduce((acc, note) => {
     acc[getNoteId(note)] = note
     return acc
@@ -101,6 +99,26 @@ const Matrix = () => {
     setReload((current) => !current)
     // eslint-disable-next-line no-restricted-globals
     history.replaceState({}, null, '/')
+  }
+
+  const handleMatrixWheel = (e) => {
+    const horizontalDelta =
+      Math.abs(e.deltaX) >= Math.abs(e.deltaY)
+        ? e.deltaX
+        : e.shiftKey
+          ? e.deltaY
+          : 0
+
+    if (!horizontalDelta) return
+
+    e.preventDefault()
+    horizontalScrollRemainder.current += horizontalDelta
+    const stepSize = 32
+    const steps = Math.trunc(horizontalScrollRemainder.current / stepSize)
+    if (!steps) return
+
+    setShift((current) => current + steps)
+    horizontalScrollRemainder.current -= steps * stepSize
   }
 
   const toggleNote = async ({ x, y, noteValue }) => {
@@ -241,119 +259,7 @@ const Matrix = () => {
   return (
     <div>
       <div className={`options  ${isSongModalOpen ? 'blured' : ''}`}>
-        <div className="menu">
-          <button
-            className="ui label"
-            title="shift right"
-            onClick={() => {
-              setShift(shift + 1)
-            }}
-          >
-            {'>>'}
-          </button>
-          <input
-            className="ui"
-            onChange={(e) => setShift(+e.target.value || 0)}
-            title="shift"
-            value={shift}
-            min={-AllNotes.length}
-            max={AllNotes.length}
-            style={{
-              width: 25,
-              textAlign: 'center',
-              fontSize: 10,
-            }}
-          />
-          <button
-            className="ui label"
-            title="shift left"
-            onClick={() => setShift(shift - 1)}
-          >
-            {'<<'}
-          </button>
-          <input
-            title="offset"
-            className="ui"
-            onChange={(e) => {
-              const val = +e.target.value
-              setOffset(val)
-              offsetNotes()
-            }}
-            value={offset}
-            type="number"
-            min={0}
-            max={AllNotes.length}
-            style={{
-              width: 40,
-              textAlign: 'center',
-              fontSize: 10,
-            }}
-          />
-          <input
-            className="ui"
-            title="change speed"
-            onChange={(e) => setSpeed(+e.target.value)}
-            step="0.1"
-            type="number"
-            style={{
-              width: 80,
-              fontSize: 10,
-              textAlign: 'center',
-            }}
-            value={speed}
-          />
-
-          <input
-            className="ui"
-            onChange={(e) => {
-              const amount = +e.target.value
-              if (amount >= 0 && amount <= 100) adjustVolume(amount)
-            }}
-            title="volume"
-            value={volume}
-            type="number"
-            min={0}
-            max={100}
-            style={{
-              width: 50,
-              textAlign: 'center',
-              fontSize: 10,
-            }}
-          />
-          <button
-            onClick={() => {
-              setScreenshotIsShow(false)
-              html2canvas(document.querySelector('.matrix'), {
-                backgroundColor: 'transparent',
-                canvas: screenshotCanvas,
-                onclone: (_, element) => {
-                  const notes = element.querySelectorAll('.note-button')
-                  for (const note of notes)
-                    if (note.style.opacity === INACTIVE_OPACITY)
-                      note.style.opacity = '0'
-                },
-              }).then((canvas) => {
-                if (!screenshotCanvas) {
-                  const handler = document.getElementById('screenshotHandler')
-                  handler.innerHTML = ''
-                  handler.appendChild(canvas)
-                } else setScreenshotCanvas(screenshotCanvas)
-                setScreenshotIsShow(true)
-              })
-            }}
-            className="ui label"
-          >
-            ghost
-          </button>
-          <button
-            onClick={() => setScreenshotIsShow(!isScreenshotShown)}
-            className="ui label"
-          >
-            {isScreenshotShown ? 'hide' : 'show'}
-          </button>
-        </div>
-
-        <div className="tools">
+        <div className="toolbar">
           <button
             onClick={async () => {
               if (pagination !== 0) {
@@ -412,6 +318,39 @@ const Matrix = () => {
             x
           </button>
 
+          <input
+            title="offset"
+            className="ui toolbar-input"
+            onChange={(e) => {
+              const val = +e.target.value
+              setOffset(val)
+              offsetNotes()
+            }}
+            value={offset}
+            type="number"
+            min={0}
+            max={AllNotes.length}
+          />
+          <input
+            className="ui toolbar-input speed-input"
+            title="change speed"
+            onChange={(e) => setSpeed(+e.target.value)}
+            step="0.1"
+            type="number"
+            value={speed}
+          />
+          <input
+            className="ui toolbar-input"
+            onChange={(e) => {
+              const amount = +e.target.value
+              if (amount >= 0 && amount <= 100) adjustVolume(amount)
+            }}
+            title="volume"
+            value={volume}
+            type="number"
+            min={0}
+            max={100}
+          />
           <button
             title="song json"
             className="ui label"
@@ -460,37 +399,45 @@ const Matrix = () => {
           </div>
         </div>
       )}
-      <div
-        id="screenshotHandler"
-        style={{
-          position: 'absolute',
-          display: isScreenshotShown ? 'block' : 'none',
-        }}
-      ></div>
       {load && (
         <div
-          className={`matrix ${isSongModalOpen ? 'blured' : ''}`}
-          style={{ gridTemplateColumns: 'auto '.repeat(width) }}
+          className={`matrix-viewport ${isSongModalOpen ? 'blured' : ''}`}
+          onWheel={handleMatrixWheel}
         >
-          {matrix(mod, width, null).map((row, i) =>
-            row.map((col, j) => (
-              <Note
-                x={i + pagination}
-                y={j - shift}
-                key={i + '-' + (j - shift)}
-                noteValue={Notes[j - shift + offset]}
-                currentNote={{
-                  ...(notesById[`${i + pagination}:${j - shift}`] || {
-                    x: i + pagination,
-                    y: j - shift,
-                  }),
-                  active: Boolean(notesById[`${i + pagination}:${j - shift}`]),
-                }}
-                mod={mod}
-                onToggle={toggleNote}
-              />
-            ))
-          )}
+          <div
+            className="pitch-bar"
+            style={{ gridTemplateColumns: 'auto '.repeat(width) }}
+          >
+            {Array.from({ length: width }, (_, index) => (
+              <div className="pitch-label" key={`pitch-${index}`}>
+                {Notes[index - shift + offset] || ''}
+              </div>
+            ))}
+          </div>
+          <div
+            className="matrix"
+            style={{ gridTemplateColumns: 'auto '.repeat(width) }}
+          >
+            {matrix(mod, width, null).map((row, i) =>
+              row.map((col, j) => (
+                <Note
+                  x={i + pagination}
+                  y={j - shift}
+                  key={i + '-' + (j - shift)}
+                  noteValue={Notes[j - shift + offset]}
+                  currentNote={{
+                    ...(notesById[`${i + pagination}:${j - shift}`] || {
+                      x: i + pagination,
+                      y: j - shift,
+                    }),
+                    active: Boolean(notesById[`${i + pagination}:${j - shift}`]),
+                  }}
+                  mod={mod}
+                  onToggle={toggleNote}
+                />
+              ))
+            )}
+          </div>
         </div>
       )}
     </div>

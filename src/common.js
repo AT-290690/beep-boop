@@ -14,9 +14,23 @@ export const hashCode = (str) => {
     hash = str.charCodeAt(i) + ((hash << 5) - hash)
   return hash
 }
-export const intToRGB = (i) => {
-  const c = (i & 0x00ffffff).toString(16).toUpperCase()
-  return '000000'.substring(0, 6 - c.length) + c
+const BRIGHT_NOTE_COLORS = [
+  '#FF595E',
+  '#FF924C',
+  '#FFCA3A',
+  '#8AC926',
+  '#52D1DC',
+  '#1982C4',
+  '#6A4C93',
+  '#F15BB5',
+  '#00F5D4',
+  '#9BFF00',
+  '#FF6B6B',
+  '#FFD166',
+]
+export const getBrightColor = (value) => {
+  const index = Math.abs(hashCode(value)) % BRIGHT_NOTE_COLORS.length
+  return BRIGHT_NOTE_COLORS[index]
 }
 export const matrix = (x, y, v) =>
   Array(x)

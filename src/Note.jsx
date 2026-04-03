@@ -3,13 +3,12 @@ import {
   ACTIVE_OPACITY,
   INACTIVE_OPACITY,
   elementsMap,
-  hashCode,
-  intToRGB,
+  getBrightColor,
 } from './common'
 
 const Note = ({ x, y, noteValue, currentNote, mod, onToggle }) => {
   const opacity = currentNote.active ? ACTIVE_OPACITY : INACTIVE_OPACITY
-  const color = '#' + intToRGB(hashCode(`${noteValue || 'rest'}1230`))
+  const color = getBrightColor(`${noteValue || 'rest'}1230`)
   return (
     <button
       style={{ opacity }}

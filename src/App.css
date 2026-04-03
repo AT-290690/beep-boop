@@ -28,12 +28,13 @@ button {
   text-align: center;
 }
 
-.tools {
+.toolbar {
   display: flex;
   flex-wrap: wrap;
   gap: 2px;
-  align-items: flex-start;
-  vertical-align: middle;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
 }
 
 .ui {
@@ -125,28 +126,34 @@ button {
   opacity: 1;
 }
 
-.menu {
-  display: flex;
-  position: absolute;
-  z-index: 100;
-  top: 40px;
+.options {
+  width: 100%;
+  padding-top: 40px;
 }
 
-.menu {
-  left: 0;
+.matrix-viewport {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.matrix {
+.pitch-bar {
   display: grid;
   gap: 10px;
   margin-top: 30px;
   margin-right: 10px;
 }
 
-#screenshotHandler {
-  pointer-events: none;
-  filter: grayscale(100%);
-  margin-top: 30px;
+.pitch-label {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 10px;
+  line-height: 1;
+  text-align: center;
+}
+
+.matrix {
+  display: grid;
+  gap: 10px;
   margin-right: 10px;
 }
 
@@ -178,6 +185,16 @@ button {
 }
 input {
   padding-left: 10px;
+}
+
+.toolbar-input {
+  width: 48px;
+  text-align: center;
+  font-size: 10px;
+}
+
+.speed-input {
+  width: 80px;
 }
 
 textarea {
