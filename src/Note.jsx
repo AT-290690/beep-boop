@@ -1,67 +1,28 @@
-import React, { useState } from 'react'
+import React from 'react'
 import {
   ACTIVE_OPACITY,
   INACTIVE_OPACITY,
-  ensureAudioStarted,
   elementsMap,
   hashCode,
   intToRGB,
 } from './common'
 
-const Note = ({ i, j, note, sound, sheet, mod, volume, speed }) => {
-  const id = `${i}:${j}`
-  const imported = sheet[id] || null
-  const currentNote = imported ? sheet[id] : { delay: 0.1, x: i, y: j }
-  const delay = currentNote.delay
-  const size = currentNote.delay > 0.1 ? currentNote.delay + 1 : 1
-  // const [delay, setDelay] = useState(currentNote.delay);
-  // const [size, setSize] = useState(
-  //   currentNote.delay > 0.1 ? currentNote.delay + 1 : 1
-  // );
-
-  const [opacity, setOpacity] = useState(
-    imported ? ACTIVE_OPACITY : INACTIVE_OPACITY
-  )
-  const [color] = useState('#' + intToRGB(hashCode(note + '1230')))
-  if (imported) {
-    sheet[id] = currentNote
-    sheet[id].value = note
-  }
+const Note = ({ x, y, noteValue, currentNote, mod, onToggle }) => {
+  const opacity = currentNote.active ? ACTIVE_OPACITY : INACTIVE_OPACITY
+  const color = '#' + intToRGB(hashCode(`${noteValue || 'rest'}1230`))
   return (
     <button
       style={{ opacity }}
       ref={(element) => {
-        if (element !== null && i < mod) elementsMap.set(id, element)
+        if (element !== null && x < mod) elementsMap.set(`${x}:${y}`, element)
       }}
       className="note-button"
-      id={id}
-      title={note}
-      // onKeyPress={e => {
-      //   if (e.key === '=') {
-      //     setDelay(Math.max(0, delay + 0.05));
-      //     setSize(delay + 1);
-      //   } else if (e.key === '-') {
-      //     setDelay(Math.max(0, delay - 0.05));
-      //     setSize(delay + 1);
-      //   }
-      // }}
-      onClick={async () => {
-        const id = `${i}:${j}`
-        if (sheet[id]) {
-          setOpacity(INACTIVE_OPACITY)
-          delete sheet[id]
-        } else {
-          await ensureAudioStarted()
-          setOpacity('1')
-          sound.volume.value = volume - 30
-          sound.triggerAttackRelease(note, delay * speed)
-          sheet[id] = { value: note, delay, x: i, y: j }
-        }
-      }}
+      id={`${x}:${y}`}
+      title={noteValue}
+      onClick={() => onToggle({ x, y, noteValue })}
     >
       <div
         style={{
-          transform: `scale(1, ${size})`,
           backgroundColor: color,
         }}
         className="shape"

@@ -5,10 +5,16 @@ import {
   sound,
   ensureAudioStarted,
   clearAllTimeouts,
+  getNoteId,
+  getNoteValue,
   INACTIVE_OPACITY,
   INITIAL_DELAY,
+  NOTE_DURATION,
   SECOND,
   ACTIVE_OPACITY,
+  normalizeSong,
+  serializeSong,
+  sortNotes,
 } from './common.js'
 import React, { useState, useEffect, useLayoutEffect } from 'react'
 import html2canvas from 'html2canvas'
@@ -40,33 +46,36 @@ const Matrix = () => {
   const [speed, setSpeed] = useState(0.25)
   const [pagination, setPagination] = useState(0)
   const [size, setSize] = useState(15)
-  const [sheet, setSheet] = useState({})
+  const [notes, setNotes] = useState([])
   const [reload, setReload] = useState(true)
   const [load, setLoad] = useState(false)
   const [currentMusic, setCurrentMusic] = useState('')
-  const [isMusicListOpen, setIsMusicListOpen] = useState(false)
+  const [isSongModalOpen, setIsSongModalOpen] = useState(false)
   const [screenshotCanvas, setScreenshotCanvas] = useState()
   const [isScreenshotShown, setScreenshotIsShow] = useState(false)
 
   const resize = useWindowSize({ w: width, h: mod })
+  const notesById = notes.reduce((acc, note) => {
+    acc[getNoteId(note)] = note
+    return acc
+  }, {})
 
   const adjustVolume = (volume) => setVolume(volume)
 
   const addMusicFromList = (current) => {
+    const nextSong = normalizeSong(current)
     setLoad(false)
-    setSpeed(current.speed)
-    setOffset(current.offset)
-    setShift(current.shift)
-    setSheet(current.sheet)
-    setIsMusicListOpen(false)
-    callibrateNotes(current.sheet)
-    // setCurrentMusic(JSON.stringify(current));
+    setSpeed(nextSong.speed)
+    setOffset(nextSong.offset)
+    setShift(nextSong.shift)
+    setNotes(nextSong.notes)
+    setIsSongModalOpen(false)
+    callibrateNotes(nextSong.notes)
   }
-  const callibrateNotes = (sheet) => {
+  const callibrateNotes = (nextNotes) => {
     editMode()
     let pages = Math.floor(
-      Object.values(sheet).reduce((acc, n) => (acc = Math.max(acc, n.x)), 0) /
-        mod
+      nextNotes.reduce((acc, note) => Math.max(acc, note.x), 0) / mod
     )
     const iteratePages = (page) => {
       setLoad(false)
@@ -79,72 +88,97 @@ const Matrix = () => {
     iteratePages(0)
   }
 
-  const offsetNotes = (value) => {
+  const offsetNotes = () => {
     setLoad(false)
-    callibrateNotes(sheet)
-    setReload(!reload)
+    callibrateNotes(notes)
+    setReload((current) => !current)
   }
   const clearNotes = () => {
     clearAllTimeouts()
-    setSheet({})
+    setNotes([])
     setPagination(0)
     setLoad(false)
-    setReload(!reload)
+    setReload((current) => !current)
     // eslint-disable-next-line no-restricted-globals
     history.replaceState({}, null, '/')
   }
 
+  const toggleNote = async ({ x, y, noteValue }) => {
+    if (!noteValue) return
+    const id = getNoteId({ x, y })
+    if (notesById[id]) {
+      setNotes((current) => current.filter((note) => getNoteId(note) !== id))
+      return
+    }
+
+    await ensureAudioStarted()
+    sound.volume.value = volume - 30
+    sound.triggerAttackRelease(noteValue, NOTE_DURATION * speed)
+    setNotes((current) => sortNotes([...current, { x, y }]))
+  }
+
   const playInterval = () => {
-    let localMax = -Infinity
     setTimeout(() => {
       if (size !== mod) setSize(mod)
       clearAllTimeouts()
-      const sheetArr = Object.values(sheet).map((note) => {
+      const localMax = notes.reduce((max, note) => Math.max(max, note.x), -1)
+
+      notes.forEach((note) => {
         const { x, y } = note
         const element = elementsMap.get(`${(x + pagination) % mod}:${y}`)
+        const value = getNoteValue(y, offset)
         if (element) {
           element.style.opacity = INACTIVE_OPACITY
           element.firstChild.style.transform = `scale(1)`
         }
-        localMax = Math.max(localMax, x)
-        return { note, element, index: x }
+        if (!value) return
+
+        setTimeout(() => {
+          sound.volume.value = volume - 30
+          sound.triggerAttackRelease(value, Math.max(NOTE_DURATION * speed, 0.1))
+          if (element) element.style.opacity = ACTIVE_OPACITY
+          setTimeout(() => {
+            if (element)
+              setTimeout(() => {
+                element.style.opacity = INACTIVE_OPACITY
+                element.firstChild.style.transform = `scale(1)`
+              }, (speed * NOTE_DURATION + 1) * INITIAL_DELAY + INITIAL_DELAY)
+          }, (speed * NOTE_DURATION + 1) * INITIAL_DELAY)
+        }, speed * x * SECOND + INITIAL_DELAY * 2)
       })
 
-      for (let i = 0; i < localMax; i++)
-        if (!sheetArr[i]) sheetArr[i] = { note: null, element: null, index: i }
-      setCurrentMusic(JSON.stringify({ sheet, offset, speed, shift }))
-      sheetArr.forEach(
-        ({ note, element, index }) =>
-          note &&
-          setTimeout(() => {
-            const { value, delay } = note
-            sound.volume.value = volume - 30
-            sound.triggerAttackRelease(value, Math.max(delay * speed, 0.1))
-            if (element) element.style.opacity = ACTIVE_OPACITY
-            // element.firstChild.style.transform = `scale(1, ${
-            //   delay > 0.1 ? delay + 1 : 1
-            // })`
-            setTimeout(() => {
-              if (element)
-                setTimeout(() => {
-                  element.style.opacity = INACTIVE_OPACITY
-                  element.firstChild.style.transform = `scale(1)`
-                }, (speed * delay + 1) * INITIAL_DELAY + INITIAL_DELAY)
-              index === localMax && setTimeout(() => playInterval(), SECOND)
-            }, (speed * delay + 1) * INITIAL_DELAY)
-          }, speed * index * SECOND + INITIAL_DELAY * 2)
-      )
+      if (localMax >= 0) {
+        setTimeout(
+          () => playInterval(),
+          speed * localMax * SECOND +
+            (speed * NOTE_DURATION + 1) * INITIAL_DELAY +
+            SECOND +
+            INITIAL_DELAY * 2
+        )
+      }
     }, INITIAL_DELAY * (pagination === 0 ? 1 : 5))
   }
 
   const editMode = () => {
     setLoad(false)
     clearAllTimeouts()
-    setReload(!reload)
+    setReload((current) => !current)
   }
 
   useEffect(() => {
+    setCurrentMusic(serializeSong({ notes, offset, speed, shift }))
+  }, [notes, offset, speed, shift])
+
+  useEffect(() => {
     const onKeyDown = async (e) => {
+      const tagName = e.target.tagName
+      if (
+        tagName === 'INPUT' ||
+        tagName === 'TEXTAREA' ||
+        e.target.isContentEditable
+      )
+        return
+
       e.preventDefault()
       e.stopPropagation()
       switch (e.key.toLowerCase()) {
@@ -180,6 +214,9 @@ const Matrix = () => {
           clearAllTimeouts()
           setLoad(true)
           break
+        case 'escape':
+          setIsSongModalOpen(false)
+          break
         // case 'enter':
         //   if (e.target.value.includes('sheet'))
         //     addMusicFromList(JSON.parse(e.target.value))
@@ -190,8 +227,7 @@ const Matrix = () => {
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shift, pagination])
+  }, [mod, notes, offset, pagination, shift, size, speed, volume])
 
   useEffect(() => {
     setLoad(false)
@@ -204,7 +240,7 @@ const Matrix = () => {
 
   return (
     <div>
-      <div className={`options  ${isMusicListOpen ? 'blured' : ''}`}>
+      <div className={`options  ${isSongModalOpen ? 'blured' : ''}`}>
         <div className="menu">
           <button
             className="ui label"
@@ -241,7 +277,7 @@ const Matrix = () => {
             onChange={(e) => {
               const val = +e.target.value
               setOffset(val)
-              offsetNotes(offset)
+              offsetNotes()
             }}
             value={offset}
             type="number"
@@ -323,7 +359,7 @@ const Matrix = () => {
               if (pagination !== 0) {
                 setPagination(0)
                 setLoad(false)
-                setReload(!reload)
+                setReload((current) => !current)
               } else {
                 await ensureAudioStarted()
                 playInterval()
@@ -350,7 +386,7 @@ const Matrix = () => {
               if (pagination <= 0) return
               setLoad(false)
               setPagination(pagination - size)
-              setReload(!reload)
+              setReload((current) => !current)
             }}
             title="up"
             className="ui"
@@ -365,7 +401,7 @@ const Matrix = () => {
             onClick={(e) => {
               setLoad(false)
               setPagination(size + pagination)
-              setReload(!reload)
+              setReload((current) => !current)
             }}
             className="ui"
           >
@@ -376,19 +412,54 @@ const Matrix = () => {
             x
           </button>
 
-          <input
-            title="title"
-            onChange={(e) => {
-              if (e.target.value.includes('sheet')) {
-                setCurrentMusic(e.target.value)
-                addMusicFromList(JSON.parse(e.target.value))
-              }
-            }}
-            value={currentMusic}
-            className="ui title"
-          />
+          <button
+            title="song json"
+            className="ui label"
+            onClick={() => setIsSongModalOpen(true)}
+          >
+            song
+          </button>
         </div>
       </div>
+      {isSongModalOpen && (
+        <div
+          className="modal-backdrop"
+          onClick={() => setIsSongModalOpen(false)}
+          role="presentation"
+        >
+          <div
+            className="collection song-modal"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Song JSON"
+          >
+            <div className="modal-header">
+              <button
+                title="close song modal"
+                className="ui label"
+                onClick={() => setIsSongModalOpen(false)}
+              >
+                close
+              </button>
+            </div>
+            <textarea
+              title="song json"
+              onChange={(e) => {
+                const rawSong = e.target.value
+                setCurrentMusic(rawSong)
+                try {
+                  addMusicFromList(JSON.parse(rawSong))
+                } catch (_) {
+                  // Leave the textarea untouched until the JSON becomes valid.
+                }
+              }}
+              value={currentMusic}
+              className="ui title song-editor"
+            />
+          </div>
+        </div>
+      )}
       <div
         id="screenshotHandler"
         style={{
@@ -398,21 +469,25 @@ const Matrix = () => {
       ></div>
       {load && (
         <div
-          className={`matrix ${isMusicListOpen ? 'blured' : ''}`}
+          className={`matrix ${isSongModalOpen ? 'blured' : ''}`}
           style={{ gridTemplateColumns: 'auto '.repeat(width) }}
         >
           {matrix(mod, width, null).map((row, i) =>
             row.map((col, j) => (
               <Note
-                i={i + pagination}
-                j={j - shift}
+                x={i + pagination}
+                y={j - shift}
                 key={i + '-' + (j - shift)}
-                note={Notes[j - shift + offset]}
-                sound={sound}
-                sheet={sheet}
-                speed={speed}
+                noteValue={Notes[j - shift + offset]}
+                currentNote={{
+                  ...(notesById[`${i + pagination}:${j - shift}`] || {
+                    x: i + pagination,
+                    y: j - shift,
+                  }),
+                  active: Boolean(notesById[`${i + pagination}:${j - shift}`]),
+                }}
                 mod={mod}
-                volume={volume}
+                onToggle={toggleNote}
               />
             ))
           )}

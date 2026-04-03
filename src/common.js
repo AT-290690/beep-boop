@@ -3,8 +3,11 @@ export const INACTIVE_OPACITY = '0.2'
 export const ACTIVE_OPACITY = '1'
 export const INITIAL_DELAY = 100
 export const SECOND = 1000
+export const NOTE_DURATION = 0.1
 let startAudioPromise = null
 export const getNoteId = (note) => `${note.x}:${note.y}`
+export const sortNotes = (notes) =>
+  [...notes].sort((left, right) => left.x - right.x || left.y - right.y)
 export const hashCode = (str) => {
   let hash = 0
   for (let i = 0; i < str.length; i++)
@@ -38,6 +41,59 @@ export const ensureAudioStarted = () => {
   }
   return startAudioPromise
 }
+export const normalizeNotes = (notes = []) =>
+  sortNotes(
+    Array.from(
+      notes
+        .map(({ x, y }) => ({
+          x: Number(x),
+          y: Number(y),
+        }))
+        .filter(({ x, y }) => Number.isFinite(x) && Number.isFinite(y))
+        .reduce((acc, note) => acc.set(getNoteId(note), note), new Map())
+        .values()
+    )
+  )
+export const normalizeSong = (song = {}) => {
+  const fallback = { notes: [], offset: 15, speed: 0.25, shift: 0 }
+  if (!song || typeof song !== 'object') return fallback
+
+  const nextOffset = Number(song.offset)
+  const nextSpeed = Number(song.speed)
+  const nextShift = Number(song.shift)
+
+  if (Array.isArray(song.notes)) {
+    return {
+      notes: normalizeNotes(song.notes),
+      offset: Number.isFinite(nextOffset) ? nextOffset : fallback.offset,
+      speed: Number.isFinite(nextSpeed) ? nextSpeed : fallback.speed,
+      shift: Number.isFinite(nextShift) ? nextShift : fallback.shift,
+    }
+  }
+
+  if (song.sheet && typeof song.sheet === 'object') {
+    return {
+      notes: normalizeNotes(Object.values(song.sheet)),
+      offset: Number.isFinite(nextOffset) ? nextOffset : fallback.offset,
+      speed: Number.isFinite(nextSpeed) ? nextSpeed : fallback.speed,
+      shift: Number.isFinite(nextShift) ? nextShift : fallback.shift,
+    }
+  }
+
+  return fallback
+}
+export const serializeSong = ({ notes, offset, speed, shift }) =>
+  JSON.stringify(
+    {
+      notes: normalizeNotes(notes).map(({ x, y }) => ({ x, y })),
+      offset,
+      speed,
+      shift,
+    },
+    null,
+    2
+  )
+export const getNoteValue = (y, offset) => AllNotes[y + offset]
 export const clearAllTimeouts = () => {
   let id = window.setTimeout(() => {}, 0)
   while (id--) {
