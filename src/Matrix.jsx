@@ -158,7 +158,7 @@ const Matrix = () => {
   }
 
   const toggleNote = async ({ x, y, noteValue }) => {
-    if (!noteValue || x < 0) return
+    if (!noteValue) return
     const id = getNoteId({ x, y })
     if (notesById[id]) {
       setNotes((current) => current.filter((note) => getNoteId(note) !== id))
