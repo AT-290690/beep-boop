@@ -17,6 +17,7 @@ import {
   sortNotes,
   SYNTH_PRESET_OPTIONS,
 } from './common.js'
+import LZString from 'lz-string'
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import * as Tone from 'tone'
 import Note from './Note.jsx'
@@ -38,6 +39,8 @@ const useWindowSize = (initial) => {
 }
 
 const Matrix = () => {
+  const { compressToEncodedURIComponent, decompressFromEncodedURIComponent } =
+    LZString
   const [mod, setMod] = useState(15)
   const [width, setWidth] = useState(30)
   const [offset, setOffset] = useState(15)
@@ -59,6 +62,8 @@ const Matrix = () => {
   const isPlayingRef = useRef(false)
   const transportEventIdRef = useRef(null)
   const notesByRowRef = useRef(new Map())
+  const pendingSharedPlaybackRef = useRef(false)
+  const didLoadSharedSongRef = useRef(false)
   const heldTimeScrollRef = useRef({
     direction: 0,
     startedAt: 0,
@@ -81,6 +86,24 @@ const Matrix = () => {
           )
         )
       : 0
+
+  const getSerializedCurrentSong = () =>
+    serializeSong({
+      notes,
+      offset,
+      speed,
+      shift,
+      synth: synthPreset,
+      pitchMap,
+    })
+
+  const updateSharedUrl = (compressedSong) => {
+    const nextUrl = new URL(window.location.href)
+    if (compressedSong) nextUrl.searchParams.set('l', compressedSong)
+    else nextUrl.searchParams.delete('l')
+    window.history.replaceState({}, '', nextUrl)
+    return nextUrl.toString()
+  }
 
   const applySong = (current, { closeModal = true } = {}) => {
     const nextSong = fitSongToViewport(current, width)
@@ -106,8 +129,7 @@ const Matrix = () => {
     stopPlayback()
     setNotes([])
     setPagination(0)
-    // eslint-disable-next-line no-restricted-globals
-    history.replaceState({}, null, '/')
+    updateSharedUrl('')
   }
   const jumpToSongStart = () => {
     setPagination(getSongStartRow(notes))
@@ -219,6 +241,16 @@ const Matrix = () => {
     finishPlayback()
   }
 
+  const tryStartPendingSharedPlayback = async () => {
+    if (!pendingSharedPlaybackRef.current) return
+    try {
+      await startPlayback()
+      pendingSharedPlaybackRef.current = false
+    } catch (_) {
+      // Audio start may still require a gesture; keep the pending flag set.
+    }
+  }
+
   const toggleNote = async ({ x, y, noteValue }) => {
     if (!noteValue) return
     const id = getNoteId({ x, y })
@@ -310,6 +342,21 @@ const Matrix = () => {
     }
   }
 
+  const shareSongLink = async () => {
+    const serializedSong = getSerializedCurrentSong()
+    const compressedSong = compressToEncodedURIComponent(serializedSong)
+    const shareUrl = updateSharedUrl(compressedSong)
+    try {
+      if (navigator.share) {
+        await navigator.share({ url: shareUrl })
+        return
+      }
+      await navigator.clipboard.writeText(shareUrl)
+    } catch (_) {
+      // Ignore share/clipboard failures; the URL still updates locally.
+    }
+  }
+
   const convertSongInTextarea = () => {
     try {
       const convertedSong = convertTrackerTextToSong(currentMusic, {
@@ -326,14 +373,7 @@ const Matrix = () => {
 
   useEffect(() => {
     setCurrentMusic(
-      serializeSong({
-        notes,
-        offset,
-        speed,
-        shift,
-        synth: synthPreset,
-        pitchMap,
-      })
+      getSerializedCurrentSong()
     )
   }, [notes, offset, speed, shift, synthPreset, pitchMap])
 
@@ -351,6 +391,43 @@ const Matrix = () => {
       return acc
     }, new Map())
   }, [notes, offset, pitchMap])
+
+  useEffect(() => {
+    const compressedSong = new URLSearchParams(window.location.search).get('l')
+    if (!compressedSong || didLoadSharedSongRef.current) return
+
+    didLoadSharedSongRef.current = true
+
+    try {
+      const rawSong = decompressFromEncodedURIComponent(compressedSong)
+      if (!rawSong) return
+      applySong(JSON.parse(rawSong), { closeModal: false })
+      pendingSharedPlaybackRef.current = true
+    } catch (_) {
+      pendingSharedPlaybackRef.current = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!pendingSharedPlaybackRef.current || !notes.length) return
+    void tryStartPendingSharedPlayback()
+  }, [notes])
+
+  useEffect(() => {
+    const onGesture = () => {
+      void tryStartPendingSharedPlayback()
+    }
+
+    window.addEventListener('pointerdown', onGesture, { passive: true })
+    window.addEventListener('keydown', onGesture)
+    window.addEventListener('touchstart', onGesture, { passive: true })
+
+    return () => {
+      window.removeEventListener('pointerdown', onGesture)
+      window.removeEventListener('keydown', onGesture)
+      window.removeEventListener('touchstart', onGesture)
+    }
+  }, [notes, offset, speed, pagination, synthPreset, pitchMap])
 
   useEffect(() => {
     const onKeyDown = async (e) => {
@@ -512,6 +589,13 @@ const Matrix = () => {
                 onClick={convertSongInTextarea}
               >
                 convert
+              </button>
+              <button
+                title="share song link"
+                className="ui label"
+                onClick={shareSongLink}
+              >
+                share
               </button>
               <button
                 title="copy song json"
