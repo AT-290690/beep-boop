@@ -59,6 +59,13 @@ const Matrix = () => {
   const isPlayingRef = useRef(false)
   const transportEventIdRef = useRef(null)
   const notesByRowRef = useRef(new Map())
+  const heldTimeScrollRef = useRef({
+    direction: 0,
+    startedAt: 0,
+    lastTimestamp: 0,
+    stepRemainder: 0,
+    frameId: null,
+  })
   const noteList = getNoteList(pitchMap)
   const notesById = notes.reduce((acc, note) => {
     acc[getNoteId(note)] = note
@@ -114,6 +121,53 @@ const Matrix = () => {
   const scrollTimeBy = (amount) => {
     if (!amount) return
     setPagination((current) => current + amount)
+  }
+
+  const stopHeldTimeScroll = () => {
+    const currentHold = heldTimeScrollRef.current
+    if (currentHold.frameId !== null) {
+      window.cancelAnimationFrame(currentHold.frameId)
+    }
+    heldTimeScrollRef.current = {
+      direction: 0,
+      startedAt: 0,
+      lastTimestamp: 0,
+      stepRemainder: 0,
+      frameId: null,
+    }
+  }
+
+  const startHeldTimeScroll = (direction) => {
+    const now = performance.now()
+    stopHeldTimeScroll()
+    heldTimeScrollRef.current = {
+      direction,
+      startedAt: now,
+      lastTimestamp: now,
+      stepRemainder: 0,
+      frameId: null,
+    }
+
+    const tick = (timestamp) => {
+      const currentHold = heldTimeScrollRef.current
+      if (!currentHold.direction) return
+
+      const deltaSeconds = (timestamp - currentHold.lastTimestamp) / 1000
+      const heldForSeconds = (timestamp - currentHold.startedAt) / 1000
+      const rowsPerSecond = Math.min(140, 10 + heldForSeconds * 42)
+
+      currentHold.stepRemainder += rowsPerSecond * deltaSeconds
+      const wholeSteps = Math.trunc(currentHold.stepRemainder)
+      if (wholeSteps) {
+        scrollTimeBy(currentHold.direction * wholeSteps)
+        currentHold.stepRemainder -= wholeSteps
+      }
+
+      currentHold.lastTimestamp = timestamp
+      currentHold.frameId = window.requestAnimationFrame(tick)
+    }
+
+    heldTimeScrollRef.current.frameId = window.requestAnimationFrame(tick)
   }
 
   const handleMatrixWheel = (e) => {
@@ -312,10 +366,16 @@ const Matrix = () => {
       e.stopPropagation()
       switch (e.key.toLowerCase()) {
         case 'w':
-          scrollTimeBy(-1)
+          if (!e.repeat) {
+            scrollTimeBy(-1)
+            startHeldTimeScroll(-1)
+          }
           break
         case 's':
-          scrollTimeBy(1)
+          if (!e.repeat) {
+            scrollTimeBy(1)
+            startHeldTimeScroll(1)
+          }
           break
         case 'a':
           scrollPitchBy(-1)
@@ -343,8 +403,23 @@ const Matrix = () => {
           break
       }
     }
+    const onKeyUp = (e) => {
+      const key = e.key.toLowerCase()
+      if (key === 'w' || key === 's') {
+        stopHeldTimeScroll()
+      }
+    }
+    const onBlur = () => {
+      stopHeldTimeScroll()
+    }
     document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
+    document.addEventListener('keyup', onKeyUp)
+    window.addEventListener('blur', onBlur)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('blur', onBlur)
+    }
   }, [mod, notes, offset, pagination, speed])
 
   useEffect(() => {
@@ -352,7 +427,13 @@ const Matrix = () => {
     setMod(resize.h)
   }, [resize.w, resize.h])
 
-  useEffect(() => () => stopPlayback(), [])
+  useEffect(
+    () => () => {
+      stopHeldTimeScroll()
+      stopPlayback()
+    },
+    []
+  )
 
   return (
     <div>
