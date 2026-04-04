@@ -120,6 +120,7 @@ const Matrix = () => {
 
   const scrollTimeBy = (amount) => {
     if (!amount) return
+    if (isPlayingRef.current) stopPlayback()
     setPagination((current) => current + amount)
   }
 
