@@ -2,7 +2,6 @@ import {
   matrix,
   sound,
   ensureAudioStarted,
-  clearAllTimeouts,
   DEFAULT_SYNTH_PRESET,
   DEFAULT_PITCH_MAP,
   convertTrackerTextToSong,
@@ -19,6 +18,7 @@ import {
   SYNTH_PRESET_OPTIONS,
 } from './common.js'
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react'
+import * as Tone from 'tone'
 import Note from './Note.jsx'
 
 const useWindowSize = (initial) => {
@@ -46,20 +46,19 @@ const Matrix = () => {
   const [speed, setSpeed] = useState(0.25)
   const [pagination, setPagination] = useState(0)
   const [notes, setNotes] = useState([])
-  const [reload, setReload] = useState(true)
-  const [load, setLoad] = useState(false)
   const [currentMusic, setCurrentMusic] = useState('')
   const [isSongModalOpen, setIsSongModalOpen] = useState(false)
   const [synthPreset, setSynthPresetState] = useState(DEFAULT_SYNTH_PRESET)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [playingNoteIds, setPlayingNoteIds] = useState([])
+  const [activePlaybackRow, setActivePlaybackRow] = useState(null)
 
   const resize = useWindowSize({ w: width, h: mod })
   const horizontalScrollRemainder = useRef(0)
   const verticalScrollRemainder = useRef(0)
   const playbackStartRef = useRef(0)
   const isPlayingRef = useRef(false)
-  const playingNoteIdsSet = new Set(playingNoteIds)
+  const transportEventIdRef = useRef(null)
+  const notesByRowRef = useRef(new Map())
   const noteList = getNoteList(pitchMap)
   const notesById = notes.reduce((acc, note) => {
     acc[getNoteId(note)] = note
@@ -78,7 +77,7 @@ const Matrix = () => {
 
   const applySong = (current, { closeModal = true } = {}) => {
     const nextSong = fitSongToViewport(current, width)
-    setLoad(false)
+    stopPlayback()
     setSpeed(nextSong.speed)
     setOffset(nextSong.offset)
     setPitchMap(nextSong.pitchMap)
@@ -89,30 +88,22 @@ const Matrix = () => {
     callibrateNotes(nextSong.notes)
   }
   const callibrateNotes = (nextNotes) => {
-    editMode()
+    stopPlayback()
     setPagination(getSongStartRow(nextNotes))
-    setLoad(true)
   }
 
   const offsetNotes = () => {
-    setLoad(false)
     callibrateNotes(notes)
-    setReload((current) => !current)
   }
   const clearNotes = () => {
-    clearAllTimeouts()
-    setPlayingNoteIds([])
+    stopPlayback()
     setNotes([])
     setPagination(0)
-    setLoad(false)
-    setReload((current) => !current)
     // eslint-disable-next-line no-restricted-globals
     history.replaceState({}, null, '/')
   }
   const jumpToSongStart = () => {
-    setLoad(false)
     setPagination(getSongStartRow(notes))
-    setLoad(true)
   }
 
   const scrollPitchBy = (amount) => {
@@ -122,9 +113,7 @@ const Matrix = () => {
 
   const scrollTimeBy = (amount) => {
     if (!amount) return
-    setLoad(false)
     setPagination((current) => current + amount)
-    setLoad(true)
   }
 
   const handleMatrixWheel = (e) => {
@@ -155,14 +144,24 @@ const Matrix = () => {
   }
 
   const revealPlaybackRow = (row) => {
-    const followOffset = 1
-    setPagination(row - followOffset)
+    setPagination(row)
   }
 
   const finishPlayback = () => {
     isPlayingRef.current = false
     setIsPlaying(false)
-    setPlayingNoteIds([])
+    setActivePlaybackRow(null)
+  }
+
+  const stopPlayback = () => {
+    if (transportEventIdRef.current !== null) {
+      Tone.Transport.clear(transportEventIdRef.current)
+      transportEventIdRef.current = null
+    }
+    Tone.Transport.stop()
+    Tone.Transport.cancel(0)
+    Tone.Transport.position = 0
+    finishPlayback()
   }
 
   const toggleNote = async ({ x, y, noteValue }) => {
@@ -179,74 +178,65 @@ const Matrix = () => {
     setNotes((current) => sortNotes([...current, { x, y }]))
   }
 
-  const playInterval = (startX = playbackStartRef.current) => {
-    if (!isPlayingRef.current) return
-    setTimeout(() => {
-      if (!isPlayingRef.current) return
-      clearAllTimeouts()
-      const scheduledNotes = notes.filter((note) => note.x >= startX)
-      const localMax = scheduledNotes.reduce((max, note) => Math.max(max, note.x), -1)
-      const postRollRows = 3
-      const endRow = localMax + postRollRows
-
-      if (localMax < startX) {
-        finishPlayback()
-        return
-      }
-
-      for (let row = startX; row <= endRow; row++) {
-        setTimeout(() => {
-          if (!isPlayingRef.current) return
-          revealPlaybackRow(row)
-        }, speed * (row - startX) * SECOND)
-      }
-
-      scheduledNotes.forEach((note) => {
-        const { x, y } = note
-        const noteId = getNoteId(note)
-        const value = getNoteValue(y, offset, pitchMap)
-        if (!value) return
-
-        setTimeout(() => {
-          if (!isPlayingRef.current) return
-          sound.volume.value = -10
-          sound.triggerAttackRelease(
-            value,
-            Math.max(NOTE_DURATION * speed, 0.1)
-          )
-          setPlayingNoteIds((current) =>
-            current.includes(noteId) ? current : [...current, noteId]
-          )
-          setTimeout(() => {
-            setPlayingNoteIds((current) =>
-              current.filter((currentNoteId) => currentNoteId !== noteId)
-            )
-          }, Math.max(speed * SECOND * 0.8, 120))
-        }, speed * (x - startX) * SECOND + INITIAL_DELAY * 2)
-      })
-
-      setTimeout(() => {
-        if (!isPlayingRef.current) return
-        finishPlayback()
-      }, speed * (endRow - startX) * SECOND + INITIAL_DELAY * 2)
-    }, INITIAL_DELAY)
-  }
-
   const editMode = () => {
-    isPlayingRef.current = false
-    setIsPlaying(false)
-    setPlayingNoteIds([])
-    setLoad(false)
-    clearAllTimeouts()
-    setReload((current) => !current)
+    stopPlayback()
   }
 
   const startPlayback = async () => {
     await ensureAudioStarted()
+    stopPlayback()
     playbackStartRef.current = pagination
     isPlayingRef.current = true
     setIsPlaying(true)
-    playInterval(playbackStartRef.current)
+    const startX = playbackStartRef.current
+    const lastSongRow = notes.reduce(
+      (currentMax, note) => Math.max(currentMax, note.x),
+      Number.NEGATIVE_INFINITY
+    )
+    const postRollRows = 3
+    const endRow = lastSongRow + postRollRows
+
+    if (!Number.isFinite(lastSongRow) || endRow < startX) {
+      finishPlayback()
+      return
+    }
+
+    let currentRow = startX
+    transportEventIdRef.current = Tone.Transport.scheduleRepeat(
+      (time) => {
+        const row = currentRow
+        if (row > endRow) {
+          if (transportEventIdRef.current !== null) {
+            Tone.Transport.clear(transportEventIdRef.current)
+            transportEventIdRef.current = null
+          }
+          Tone.Transport.stop(time)
+          Tone.Draw.schedule(() => finishPlayback(), time)
+          return
+        }
+
+        const rowNotes = notesByRowRef.current.get(row) || []
+        rowNotes.forEach(({ value }) => {
+          sound.volume.value = -10
+          sound.triggerAttackRelease(
+            value,
+            Math.max(NOTE_DURATION * speed, 0.1),
+            time
+          )
+        })
+
+        Tone.Draw.schedule(() => {
+          if (!isPlayingRef.current) return
+          setActivePlaybackRow(rowNotes.length ? row : null)
+          revealPlaybackRow(row)
+        }, time)
+
+        currentRow += 1
+      },
+      speed,
+      0
+    )
+    Tone.Transport.start(`+${INITIAL_DELAY / SECOND}`)
   }
 
   const togglePlayback = async () => {
@@ -297,6 +287,17 @@ const Matrix = () => {
   }, [synthPreset])
 
   useEffect(() => {
+    notesByRowRef.current = notes.reduce((acc, note) => {
+      const value = getNoteValue(note.y, offset, pitchMap)
+      if (!value) return acc
+      const currentRowNotes = acc.get(note.x) || []
+      currentRowNotes.push({ value })
+      acc.set(note.x, currentRowNotes)
+      return acc
+    }, new Map())
+  }, [notes, offset, pitchMap])
+
+  useEffect(() => {
     const onKeyDown = async (e) => {
       const tagName = e.target.tagName
       if (
@@ -329,11 +330,7 @@ const Matrix = () => {
           await togglePlayback()
           break
         case 'q':
-          setLoad(false)
-          clearAllTimeouts()
-          isPlayingRef.current = false
-          setIsPlaying(false)
-          setLoad(true)
+          stopPlayback()
           break
         case 'escape':
           setIsSongModalOpen(false)
@@ -351,13 +348,11 @@ const Matrix = () => {
   }, [mod, notes, offset, pagination, speed])
 
   useEffect(() => {
-    setLoad(false)
     setWidth(resize.w)
     setMod(resize.h)
-    setLoad(true)
   }, [resize.w, resize.h])
 
-  useEffect(() => setLoad(true), [reload])
+  useEffect(() => () => stopPlayback(), [])
 
   return (
     <div>
@@ -468,52 +463,51 @@ const Matrix = () => {
           </div>
         </div>
       )}
-      {load && (
+      <div
+        className={`matrix-viewport ${isSongModalOpen ? 'blured' : ''}`}
+        onWheel={handleMatrixWheel}
+      >
         <div
-          className={`matrix-viewport ${isSongModalOpen ? 'blured' : ''}`}
-          onWheel={handleMatrixWheel}
+          className="pitch-bar"
+          style={{ gridTemplateColumns: 'auto '.repeat(width) }}
         >
-          <div
-            className="pitch-bar"
-            style={{ gridTemplateColumns: 'auto '.repeat(width) }}
-          >
-            {Array.from({ length: width }, (_, index) => (
-              <div className="pitch-label" key={`pitch-${index}`}>
-                {noteList[index - shift + offset] || ''}
-              </div>
-            ))}
-          </div>
-          <div
-            className="matrix"
-            style={{ gridTemplateColumns: 'auto '.repeat(width) }}
-          >
-            {matrix(mod, width, null).map((row, i) =>
-              row.map((col, j) => (
-                <Note
-                  x={i + pagination}
-                  y={j - shift}
-                  key={i + '-' + (j - shift)}
-                  noteValue={noteList[j - shift + offset]}
-                  isPlaying={playingNoteIdsSet.has(
-                    `${i + pagination}:${j - shift}`
-                  )}
-                  currentNote={{
-                    ...(notesById[`${i + pagination}:${j - shift}`] || {
-                      x: i + pagination,
-                      y: j - shift,
-                    }),
-                    active: Boolean(
-                      notesById[`${i + pagination}:${j - shift}`]
-                    ),
-                  }}
-                  mod={mod}
-                  onToggle={toggleNote}
-                />
-              ))
-            )}
-          </div>
+          {Array.from({ length: width }, (_, index) => (
+            <div className="pitch-label" key={`pitch-${index}`}>
+              {noteList[index - shift + offset] || ''}
+            </div>
+          ))}
         </div>
-      )}
+        <div
+          className="matrix"
+          style={{ gridTemplateColumns: 'auto '.repeat(width) }}
+        >
+          {matrix(mod, width, null).map((row, i) =>
+            row.map((col, j) => (
+              <Note
+                x={i + pagination}
+                y={j - shift}
+                key={i + '-' + (j - shift)}
+                noteValue={noteList[j - shift + offset]}
+                isPlaying={
+                  Boolean(notesById[`${i + pagination}:${j - shift}`]) &&
+                  activePlaybackRow === i + pagination
+                }
+                currentNote={{
+                  ...(notesById[`${i + pagination}:${j - shift}`] || {
+                    x: i + pagination,
+                    y: j - shift,
+                  }),
+                  active: Boolean(
+                    notesById[`${i + pagination}:${j - shift}`]
+                  ),
+                }}
+                mod={mod}
+                onToggle={toggleNote}
+              />
+            ))
+          )}
+        </div>
+      </div>
     </div>
   )
 }
