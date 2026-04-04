@@ -10,12 +10,6 @@ let startAudioPromise = null
 export const getNoteId = (note) => `${note.x}:${note.y}`
 export const sortNotes = (notes) =>
   [...notes].sort((left, right) => left.x - right.x || left.y - right.y)
-export const hashCode = (str) => {
-  let hash = 0
-  for (let i = 0; i < str.length; i++)
-    hash = str.charCodeAt(i) + ((hash << 5) - hash)
-  return hash
-}
 const BRIGHT_NOTE_COLORS = [
   '#FF595E',
   '#FF924C',
@@ -30,8 +24,31 @@ const BRIGHT_NOTE_COLORS = [
   '#FF6B6B',
   '#FFD166',
 ]
+const CHROMATIC_COLOR_ORDER = [
+  'C',
+  'C#',
+  'D',
+  'D#',
+  'E',
+  'F',
+  'F#',
+  'G',
+  'G#',
+  'A',
+  'A#',
+  'B',
+]
+const getPitchColorIndex = (value) => {
+  const match = String(value || '').match(/^([A-G](?:#)?)(-?\d+)$/)
+  if (!match) return 0
+  const [, noteName, octaveText] = match
+  const pitchClass = CHROMATIC_COLOR_ORDER.indexOf(noteName)
+  const octave = Number(octaveText)
+  if (pitchClass < 0 || !Number.isFinite(octave)) return 0
+  return octave * CHROMATIC_COLOR_ORDER.length + pitchClass
+}
 export const getBrightColor = (value) => {
-  const index = Math.abs(hashCode(value)) % BRIGHT_NOTE_COLORS.length
+  const index = getPitchColorIndex(value) % BRIGHT_NOTE_COLORS.length
   return BRIGHT_NOTE_COLORS[index]
 }
 export const matrix = (x, y, v) =>

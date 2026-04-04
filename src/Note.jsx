@@ -1,9 +1,9 @@
-import React from 'react'
+import React, { memo } from 'react'
 import { getBrightColor } from './common'
 
-const Note = ({ x, y, noteValue, currentNote, isPlaying, mod, onToggle }) => {
-  const opacity = currentNote.active ? '1' : '0.14'
-  const color = getBrightColor(`${noteValue || 'rest'}1230`)
+const Note = ({ x, y, noteValue, isActive, isPlaying, onToggle }) => {
+  const opacity = isActive ? '1' : '0.10'
+  const color = getBrightColor(noteValue)
   return (
     <button
       style={{ opacity }}
@@ -22,4 +22,13 @@ const Note = ({ x, y, noteValue, currentNote, isPlaying, mod, onToggle }) => {
     </button>
   )
 }
-export default Note
+
+export default memo(
+  Note,
+  (prevProps, nextProps) =>
+    prevProps.x === nextProps.x &&
+    prevProps.y === nextProps.y &&
+    prevProps.noteValue === nextProps.noteValue &&
+    prevProps.isActive === nextProps.isActive &&
+    prevProps.isPlaying === nextProps.isPlaying
+)

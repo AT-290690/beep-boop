@@ -22,19 +22,50 @@ import React, { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import * as Tone from 'tone'
 import Note from './Note.jsx'
 
-const useWindowSize = (initial) => {
+const DEFAULT_NOTE_SIZE = 25
+const DEFAULT_SHAPE_SIZE = 20
+const DEFAULT_GRID_GAP = 10
+const DEFAULT_WIDTH_STEP = 50
+const DEFAULT_HEIGHT_STEP = 45
+
+const FULLSCREEN_NOTE_SIZE = 16
+const FULLSCREEN_SHAPE_SIZE = 12
+const FULLSCREEN_GRID_GAP = 6
+const FULLSCREEN_WIDTH_PADDING = 32
+const FULLSCREEN_HEIGHT_PADDING = 32
+
+const useWindowSize = ({ initial, isFullscreen }) => {
   const [bounds, setBounds] = useState(initial)
   useLayoutEffect(() => {
     const updateSize = () => {
+      if (isFullscreen) {
+        const columnSpan = FULLSCREEN_NOTE_SIZE + FULLSCREEN_GRID_GAP
+        const rowSpan = FULLSCREEN_NOTE_SIZE + FULLSCREEN_GRID_GAP
+        setBounds({
+          w: Math.max(
+            8,
+            Math.floor(
+              (window.innerWidth - FULLSCREEN_WIDTH_PADDING) / columnSpan
+            )
+          ),
+          h: Math.max(
+            8,
+            Math.floor(
+              (window.innerHeight - FULLSCREEN_HEIGHT_PADDING) / rowSpan
+            )
+          ),
+        })
+        return
+      }
       setBounds({
-        w: Math.floor(window.innerWidth / 50),
-        h: Math.floor(window.innerHeight / 45),
+        w: Math.floor(window.innerWidth / DEFAULT_WIDTH_STEP),
+        h: Math.floor(window.innerHeight / DEFAULT_HEIGHT_STEP),
       })
     }
     window.addEventListener('resize', updateSize)
     updateSize()
     return () => window.removeEventListener('resize', updateSize)
-  }, [])
+  }, [isFullscreen])
   return bounds
 }
 
@@ -54,8 +85,10 @@ const Matrix = () => {
   const [synthPreset, setSynthPresetState] = useState(DEFAULT_SYNTH_PRESET)
   const [isPlaying, setIsPlaying] = useState(false)
   const [activePlaybackRow, setActivePlaybackRow] = useState(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
-  const resize = useWindowSize({ w: width, h: mod })
+  const resize = useWindowSize({ initial: { w: width, h: mod }, isFullscreen })
+  const rootRef = useRef(null)
   const horizontalScrollRemainder = useRef(0)
   const verticalScrollRemainder = useRef(0)
   const playbackStartRef = useRef(0)
@@ -72,10 +105,7 @@ const Matrix = () => {
     frameId: null,
   })
   const noteList = getNoteList(pitchMap)
-  const notesById = notes.reduce((acc, note) => {
-    acc[getNoteId(note)] = note
-    return acc
-  }, {})
+  const activeNoteIds = new Set(notes.map(getNoteId))
   const getSongStartRow = (songNotes) =>
     songNotes.length
       ? Math.min(
@@ -133,6 +163,18 @@ const Matrix = () => {
   }
   const jumpToSongStart = () => {
     setPagination(getSongStartRow(notes))
+  }
+
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen()
+        return
+      }
+      await rootRef.current?.requestFullscreen?.()
+    } catch (_) {
+      // Ignore fullscreen failures for now.
+    }
   }
 
   const scrollPitchBy = (amount) => {
@@ -254,7 +296,7 @@ const Matrix = () => {
   const toggleNote = async ({ x, y, noteValue }) => {
     if (!noteValue) return
     const id = getNoteId({ x, y })
-    if (notesById[id]) {
+    if (activeNoteIds.has(id)) {
       setNotes((current) => current.filter((note) => getNoteId(note) !== id))
       return
     }
@@ -430,6 +472,16 @@ const Matrix = () => {
   }, [notes, offset, speed, pagination, synthPreset, pitchMap])
 
   useEffect(() => {
+    const syncFullscreenState = () => {
+      setIsFullscreen(document.fullscreenElement === rootRef.current)
+    }
+    document.addEventListener('fullscreenchange', syncFullscreenState)
+    syncFullscreenState()
+    return () =>
+      document.removeEventListener('fullscreenchange', syncFullscreenState)
+  }, [])
+
+  useEffect(() => {
     const onKeyDown = async (e) => {
       const tagName = e.target.tagName
       if (
@@ -514,8 +566,12 @@ const Matrix = () => {
   )
 
   return (
-    <div>
-      <div className={`options  ${isSongModalOpen ? 'blured' : ''}`}>
+    <div
+      ref={rootRef}
+      className={`matrix-shell${isFullscreen ? ' matrix-shell-fullscreen' : ''}`}
+    >
+      {!isFullscreen && (
+        <div className={`options  ${isSongModalOpen ? 'blured' : ''}`}>
         <div className="toolbar">
           <button onClick={togglePlayback} title="play" className="ui">
             {isPlaying ? '||' : '>'}
@@ -561,6 +617,13 @@ const Matrix = () => {
             ))}
           </select>
           <button
+            title="fullscreen"
+            className="ui label"
+            onClick={toggleFullscreen}
+          >
+            full
+          </button>
+          <button
             title="song json"
             className="ui label"
             onClick={() => setIsSongModalOpen(true)}
@@ -568,7 +631,8 @@ const Matrix = () => {
             song
           </button>
         </div>
-      </div>
+        </div>
+      )}
       {isSongModalOpen && (
         <div
           className="modal-backdrop"
@@ -630,11 +694,16 @@ const Matrix = () => {
         </div>
       )}
       <div
-        className={`matrix-viewport ${isSongModalOpen ? 'blured' : ''}`}
+        className={`matrix-viewport ${isSongModalOpen ? 'blured' : ''}${isFullscreen ? ' matrix-viewport-fullscreen' : ''}`}
         onWheel={handleMatrixWheel}
+        style={{
+          '--note-size': `${isFullscreen ? FULLSCREEN_NOTE_SIZE : DEFAULT_NOTE_SIZE}px`,
+          '--shape-size': `${isFullscreen ? FULLSCREEN_SHAPE_SIZE : DEFAULT_SHAPE_SIZE}px`,
+          '--grid-gap': `${isFullscreen ? FULLSCREEN_GRID_GAP : DEFAULT_GRID_GAP}px`,
+        }}
       >
         <div
-          className="pitch-bar"
+          className={`pitch-bar${isFullscreen ? ' pitch-bar-hidden' : ''}`}
           style={{ gridTemplateColumns: 'auto '.repeat(width) }}
         >
           {Array.from({ length: width }, (_, index) => (
@@ -648,29 +717,23 @@ const Matrix = () => {
           style={{ gridTemplateColumns: 'auto '.repeat(width) }}
         >
           {matrix(mod, width, null).map((row, i) =>
-            row.map((col, j) => (
-              <Note
-                x={i + pagination}
-                y={j - shift}
-                key={i + '-' + (j - shift)}
-                noteValue={noteList[j - shift + offset]}
-                isPlaying={
-                  Boolean(notesById[`${i + pagination}:${j - shift}`]) &&
-                  activePlaybackRow === i + pagination
-                }
-                currentNote={{
-                  ...(notesById[`${i + pagination}:${j - shift}`] || {
-                    x: i + pagination,
-                    y: j - shift,
-                  }),
-                  active: Boolean(
-                    notesById[`${i + pagination}:${j - shift}`]
-                  ),
-                }}
-                mod={mod}
-                onToggle={toggleNote}
-              />
-            ))
+            row.map((col, j) => {
+              const x = i + pagination
+              const y = j - shift
+              const noteId = `${x}:${y}`
+              const isActive = activeNoteIds.has(noteId)
+              return (
+                <Note
+                  x={x}
+                  y={y}
+                  key={i + '-' + y}
+                  noteValue={noteList[j - shift + offset]}
+                  isPlaying={isActive && activePlaybackRow === x}
+                  isActive={isActive}
+                  onToggle={toggleNote}
+                />
+              )
+            })
           )}
         </div>
       </div>
