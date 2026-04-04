@@ -1,5 +1,4 @@
 import {
-  matrix,
   sound,
   ensureAudioStarted,
   DEFAULT_SYNTH_PRESET,
@@ -18,7 +17,13 @@ import {
   SYNTH_PRESET_OPTIONS,
 } from './common.js'
 import LZString from 'lz-string'
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react'
+import React, {
+  memo,
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+} from 'react'
 import * as Tone from 'tone'
 import Note from './Note.jsx'
 
@@ -33,6 +38,46 @@ const FULLSCREEN_SHAPE_SIZE = 12
 const FULLSCREEN_GRID_GAP = 6
 const FULLSCREEN_WIDTH_PADDING = 32
 const FULLSCREEN_HEIGHT_PADDING = 32
+
+const MatrixRow = memo(
+  function MatrixRow({
+    rowIndex,
+    x,
+    width,
+    shift,
+    offset,
+    noteList,
+    activeNoteIds,
+    isActiveRow,
+    onToggle,
+  }) {
+    return Array.from({ length: width }, (_, j) => {
+      const y = j - shift
+      const noteValue = noteList[j - shift + offset]
+      const noteId = `${x}:${y}`
+      const isActive = activeNoteIds.has(noteId)
+      return (
+        <Note
+          x={x}
+          y={y}
+          key={`${rowIndex}-${y}`}
+          noteValue={noteValue}
+          isPlaying={isActive && isActiveRow}
+          isActive={isActive}
+          onToggle={onToggle}
+        />
+      )
+    })
+  },
+  (prevProps, nextProps) =>
+    prevProps.x === nextProps.x &&
+    prevProps.width === nextProps.width &&
+    prevProps.shift === nextProps.shift &&
+    prevProps.offset === nextProps.offset &&
+    prevProps.noteList === nextProps.noteList &&
+    prevProps.activeNoteIds === nextProps.activeNoteIds &&
+    prevProps.isActiveRow === nextProps.isActiveRow
+)
 
 const useWindowSize = ({ initial, isFullscreen }) => {
   const [bounds, setBounds] = useState(initial)
@@ -86,6 +131,7 @@ const Matrix = () => {
   const [isPlaying, setIsPlaying] = useState(false)
   const [activePlaybackRow, setActivePlaybackRow] = useState(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [activeNoteIds, setActiveNoteIds] = useState(() => new Set())
 
   const resize = useWindowSize({ initial: { w: width, h: mod }, isFullscreen })
   const rootRef = useRef(null)
@@ -105,7 +151,6 @@ const Matrix = () => {
     frameId: null,
   })
   const noteList = getNoteList(pitchMap)
-  const activeNoteIds = new Set(notes.map(getNoteId))
   const getSongStartRow = (songNotes) =>
     songNotes.length
       ? Math.min(
@@ -424,6 +469,10 @@ const Matrix = () => {
   }, [synthPreset])
 
   useEffect(() => {
+    setActiveNoteIds(new Set(notes.map(getNoteId)))
+  }, [notes])
+
+  useEffect(() => {
     notesByRowRef.current = notes.reduce((acc, note) => {
       const value = getNoteValue(note.y, offset, pitchMap)
       if (!value) return acc
@@ -572,65 +621,69 @@ const Matrix = () => {
     >
       {!isFullscreen && (
         <div className={`options  ${isSongModalOpen ? 'blured' : ''}`}>
-        <div className="toolbar">
-          <button onClick={togglePlayback} title="play" className="ui">
-            {isPlaying ? '||' : '>'}
-          </button>
-          <button title="erase" className="ui" onClick={() => clearNotes()}>
-            x
-          </button>
-          <button title="go to song start" className="ui label" onClick={jumpToSongStart}>
-            top
-          </button>
+          <div className="toolbar">
+            <button onClick={togglePlayback} title="play" className="ui">
+              {isPlaying ? '||' : '>'}
+            </button>
+            <button title="erase" className="ui" onClick={() => clearNotes()}>
+              x
+            </button>
+            <button
+              title="go to song start"
+              className="ui label"
+              onClick={jumpToSongStart}
+            >
+              top
+            </button>
 
-          <input
-            title="offset"
-            className="ui toolbar-input"
-            onChange={(e) => {
-              const val = +e.target.value
-              setOffset(val)
-              offsetNotes()
-            }}
-            value={offset}
-            type="number"
-            min={0}
-            max={noteList.length}
-          />
-          <input
-            className="ui toolbar-input speed-input"
-            title="change speed"
-            onChange={(e) => setSpeed(+e.target.value)}
-            step="0.1"
-            type="number"
-            value={speed}
-          />
-          <select
-            title="synth"
-            className="ui toolbar-select"
-            value={synthPreset}
-            onChange={(e) => setSynthPresetState(e.target.value)}
-          >
-            {SYNTH_PRESET_OPTIONS.map(({ id, label }) => (
-              <option key={id} value={id}>
-                {label}
-              </option>
-            ))}
-          </select>
-          <button
-            title="fullscreen"
-            className="ui label"
-            onClick={toggleFullscreen}
-          >
-            full
-          </button>
-          <button
-            title="song json"
-            className="ui label"
-            onClick={() => setIsSongModalOpen(true)}
-          >
-            song
-          </button>
-        </div>
+            <input
+              title="offset"
+              className="ui toolbar-input"
+              onChange={(e) => {
+                const val = +e.target.value
+                setOffset(val)
+                offsetNotes()
+              }}
+              value={offset}
+              type="number"
+              min={0}
+              max={noteList.length}
+            />
+            <input
+              className="ui toolbar-input speed-input"
+              title="change speed"
+              onChange={(e) => setSpeed(+e.target.value)}
+              step="0.1"
+              type="number"
+              value={speed}
+            />
+            <select
+              title="synth"
+              className="ui toolbar-select"
+              value={synthPreset}
+              onChange={(e) => setSynthPresetState(e.target.value)}
+            >
+              {SYNTH_PRESET_OPTIONS.map(({ id, label }) => (
+                <option key={id} value={id}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            <button
+              title="fullscreen"
+              className="ui label"
+              onClick={toggleFullscreen}
+            >
+              full
+            </button>
+            <button
+              title="song json"
+              className="ui label"
+              onClick={() => setIsSongModalOpen(true)}
+            >
+              song
+            </button>
+          </div>
         </div>
       )}
       {isSongModalOpen && (
@@ -716,25 +769,23 @@ const Matrix = () => {
           className="matrix"
           style={{ gridTemplateColumns: 'auto '.repeat(width) }}
         >
-          {matrix(mod, width, null).map((row, i) =>
-            row.map((col, j) => {
-              const x = i + pagination
-              const y = j - shift
-              const noteId = `${x}:${y}`
-              const isActive = activeNoteIds.has(noteId)
-              return (
-                <Note
-                  x={x}
-                  y={y}
-                  key={i + '-' + y}
-                  noteValue={noteList[j - shift + offset]}
-                  isPlaying={isActive && activePlaybackRow === x}
-                  isActive={isActive}
-                  onToggle={toggleNote}
-                />
-              )
-            })
-          )}
+          {Array.from({ length: mod }, (_, i) => {
+            const x = i + pagination
+            return (
+              <MatrixRow
+                rowIndex={i}
+                x={x}
+                key={x}
+                width={width}
+                shift={shift}
+                offset={offset}
+                noteList={noteList}
+                activeNoteIds={activeNoteIds}
+                isActiveRow={activePlaybackRow === x}
+                onToggle={toggleNote}
+              />
+            )
+          })}
         </div>
       </div>
     </div>
