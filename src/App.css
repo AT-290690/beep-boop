@@ -143,6 +143,12 @@ button {
   gap: 10px;
   margin-top: 30px;
   margin-right: 10px;
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+.matrix-viewport:hover .pitch-bar {
+  opacity: 1;
 }
 
 .pitch-label {

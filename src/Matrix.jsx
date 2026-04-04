@@ -1,16 +1,18 @@
 import {
-  AllNotes,
   matrix,
   sound,
   ensureAudioStarted,
   clearAllTimeouts,
   DEFAULT_SYNTH_PRESET,
+  DEFAULT_PITCH_MAP,
+  convertTrackerTextToSong,
+  fitSongToViewport,
   getNoteId,
+  getNoteList,
   getNoteValue,
   INITIAL_DELAY,
   NOTE_DURATION,
   SECOND,
-  normalizeSong,
   setSynthPreset,
   serializeSong,
   sortNotes,
@@ -39,11 +41,10 @@ const Matrix = () => {
   const [mod, setMod] = useState(15)
   const [width, setWidth] = useState(30)
   const [offset, setOffset] = useState(15)
+  const [pitchMap, setPitchMap] = useState(DEFAULT_PITCH_MAP)
   const [shift, setShift] = useState(0)
-  const [Notes] = useState(AllNotes) //.slice(shift, offset + width)
   const [speed, setSpeed] = useState(0.25)
   const [pagination, setPagination] = useState(0)
-  const [size, setSize] = useState(15)
   const [notes, setNotes] = useState([])
   const [reload, setReload] = useState(true)
   const [load, setLoad] = useState(false)
@@ -59,36 +60,38 @@ const Matrix = () => {
   const playbackStartRef = useRef(0)
   const isPlayingRef = useRef(false)
   const playingNoteIdsSet = new Set(playingNoteIds)
+  const noteList = getNoteList(pitchMap)
   const notesById = notes.reduce((acc, note) => {
     acc[getNoteId(note)] = note
     return acc
   }, {})
+  const getSongStartRow = (songNotes) =>
+    songNotes.length
+      ? Math.min(
+          0,
+          songNotes.reduce(
+            (currentMin, note) => Math.min(currentMin, note.x),
+            songNotes[0].x
+          )
+        )
+      : 0
 
-  const addMusicFromList = (current) => {
-    const nextSong = normalizeSong(current)
+  const applySong = (current, { closeModal = true } = {}) => {
+    const nextSong = fitSongToViewport(current, width)
     setLoad(false)
     setSpeed(nextSong.speed)
     setOffset(nextSong.offset)
+    setPitchMap(nextSong.pitchMap)
     setShift(nextSong.shift)
     setSynthPresetState(nextSong.synth)
     setNotes(nextSong.notes)
-    setIsSongModalOpen(false)
+    if (closeModal) setIsSongModalOpen(false)
     callibrateNotes(nextSong.notes)
   }
   const callibrateNotes = (nextNotes) => {
     editMode()
-    let pages = Math.floor(
-      nextNotes.reduce((acc, note) => Math.max(acc, note.x), 0) / mod
-    )
-    const iteratePages = (page) => {
-      setLoad(false)
-      if (page <= pages) {
-        setPagination(size * page)
-        setTimeout(() => iteratePages(++page), 150)
-      } else setPagination(0)
-      setLoad(true)
-    }
-    iteratePages(0)
+    setPagination(getSongStartRow(nextNotes))
+    setLoad(true)
   }
 
   const offsetNotes = () => {
@@ -105,6 +108,11 @@ const Matrix = () => {
     setReload((current) => !current)
     // eslint-disable-next-line no-restricted-globals
     history.replaceState({}, null, '/')
+  }
+  const jumpToSongStart = () => {
+    setLoad(false)
+    setPagination(getSongStartRow(notes))
+    setLoad(true)
   }
 
   const scrollPitchBy = (amount) => {
@@ -175,7 +183,6 @@ const Matrix = () => {
     if (!isPlayingRef.current) return
     setTimeout(() => {
       if (!isPlayingRef.current) return
-      if (size !== mod) setSize(mod)
       clearAllTimeouts()
       const scheduledNotes = notes.filter((note) => note.x >= startX)
       const localMax = scheduledNotes.reduce((max, note) => Math.max(max, note.x), -1)
@@ -197,7 +204,7 @@ const Matrix = () => {
       scheduledNotes.forEach((note) => {
         const { x, y } = note
         const noteId = getNoteId(note)
-        const value = getNoteValue(y, offset)
+        const value = getNoteValue(y, offset, pitchMap)
         if (!value) return
 
         setTimeout(() => {
@@ -258,11 +265,32 @@ const Matrix = () => {
     }
   }
 
+  const convertSongInTextarea = () => {
+    try {
+      const convertedSong = convertTrackerTextToSong(currentMusic, {
+        speed,
+        shift,
+        synth: synthPreset,
+      })
+      setCurrentMusic(serializeSong(convertedSong))
+      applySong(convertedSong, { closeModal: false })
+    } catch (_) {
+      // Leave the textarea unchanged when the source text is not convertible.
+    }
+  }
+
   useEffect(() => {
     setCurrentMusic(
-      serializeSong({ notes, offset, speed, shift, synth: synthPreset })
+      serializeSong({
+        notes,
+        offset,
+        speed,
+        shift,
+        synth: synthPreset,
+        pitchMap,
+      })
     )
-  }, [notes, offset, speed, shift, synthPreset])
+  }, [notes, offset, speed, shift, synthPreset, pitchMap])
 
   useEffect(() => {
     setSynthPreset(synthPreset)
@@ -341,6 +369,9 @@ const Matrix = () => {
           <button title="erase" className="ui" onClick={() => clearNotes()}>
             x
           </button>
+          <button title="go to song start" className="ui label" onClick={jumpToSongStart}>
+            top
+          </button>
 
           <input
             title="offset"
@@ -353,7 +384,7 @@ const Matrix = () => {
             value={offset}
             type="number"
             min={0}
-            max={AllNotes.length}
+            max={noteList.length}
           />
           <input
             className="ui toolbar-input speed-input"
@@ -399,6 +430,13 @@ const Matrix = () => {
           >
             <div className="modal-header">
               <button
+                title="convert tracker text"
+                className="ui label"
+                onClick={convertSongInTextarea}
+              >
+                convert
+              </button>
+              <button
                 title="copy song json"
                 className="ui label"
                 onClick={copySongToClipboard}
@@ -419,7 +457,7 @@ const Matrix = () => {
                 const rawSong = e.target.value
                 setCurrentMusic(rawSong)
                 try {
-                  addMusicFromList(JSON.parse(rawSong))
+                  applySong(JSON.parse(rawSong))
                 } catch (_) {
                   // Leave the textarea untouched until the JSON becomes valid.
                 }
@@ -441,7 +479,7 @@ const Matrix = () => {
           >
             {Array.from({ length: width }, (_, index) => (
               <div className="pitch-label" key={`pitch-${index}`}>
-                {Notes[index - shift + offset] || ''}
+                {noteList[index - shift + offset] || ''}
               </div>
             ))}
           </div>
@@ -455,7 +493,7 @@ const Matrix = () => {
                   x={i + pagination}
                   y={j - shift}
                   key={i + '-' + (j - shift)}
-                  noteValue={Notes[j - shift + offset]}
+                  noteValue={noteList[j - shift + offset]}
                   isPlaying={playingNoteIdsSet.has(
                     `${i + pagination}:${j - shift}`
                   )}
