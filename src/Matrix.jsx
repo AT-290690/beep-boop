@@ -131,14 +131,20 @@ const Matrix = () => {
   const [isPlaying, setIsPlaying] = useState(false)
   const [activePlaybackRow, setActivePlaybackRow] = useState(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [isTouchDevice, setIsTouchDevice] = useState(false)
   const [activeNoteIds, setActiveNoteIds] = useState(() => new Set())
 
   const resize = useWindowSize({ initial: { w: width, h: mod }, isFullscreen })
   const rootRef = useRef(null)
+  const isNativeFullscreenRef = useRef(false)
   const viewportBeforeFullscreenRef = useRef(null)
   const pendingFullscreenViewportFitRef = useRef(false)
   const horizontalScrollRemainder = useRef(0)
   const verticalScrollRemainder = useRef(0)
+  const touchScrollRef = useRef({
+    x: null,
+    y: null,
+  })
   const playbackStartRef = useRef(0)
   const isPlayingRef = useRef(false)
   const transportEventIdRef = useRef(null)
@@ -212,20 +218,45 @@ const Matrix = () => {
     setPagination(getSongStartRow(notes))
   }
 
+  const restoreViewportFromFullscreen = () => {
+    if (!viewportBeforeFullscreenRef.current) return
+    setShift(viewportBeforeFullscreenRef.current.shift)
+    setPagination(viewportBeforeFullscreenRef.current.pagination)
+    viewportBeforeFullscreenRef.current = null
+    pendingFullscreenViewportFitRef.current = false
+  }
+
   const toggleFullscreen = async () => {
     try {
-      if (document.fullscreenElement) {
-        await document.exitFullscreen()
+      if (isFullscreen) {
+        if (document.fullscreenElement === rootRef.current) {
+          await document.exitFullscreen()
+        } else {
+          isNativeFullscreenRef.current = false
+          setIsFullscreen(false)
+          restoreViewportFromFullscreen()
+        }
         return
       }
+
       viewportBeforeFullscreenRef.current = {
         shift,
         pagination,
       }
       pendingFullscreenViewportFitRef.current = true
-      await rootRef.current?.requestFullscreen?.()
+      if (
+        typeof rootRef.current?.requestFullscreen === 'function' &&
+        typeof document.exitFullscreen === 'function'
+      ) {
+        isNativeFullscreenRef.current = true
+        await rootRef.current.requestFullscreen()
+      } else {
+        isNativeFullscreenRef.current = false
+        setIsFullscreen(true)
+      }
     } catch (_) {
-      // Ignore fullscreen failures for now.
+      isNativeFullscreenRef.current = false
+      setIsFullscreen(true)
     }
   }
 
@@ -311,6 +342,53 @@ const Matrix = () => {
         scrollTimeBy(verticalSteps)
         verticalScrollRemainder.current -= verticalSteps * 32
       }
+    }
+  }
+
+  const handleMatrixTouchStart = (e) => {
+    const touch = e.touches[0]
+    if (!touch) return
+    touchScrollRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+    }
+  }
+
+  const handleMatrixTouchMove = (e) => {
+    const touch = e.touches[0]
+    const lastTouch = touchScrollRef.current
+    if (!touch || lastTouch.x === null || lastTouch.y === null) return
+
+    const deltaX = lastTouch.x - touch.clientX
+    const deltaY = lastTouch.y - touch.clientY
+    touchScrollRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+    }
+
+    if (!deltaX && !deltaY) return
+
+    e.preventDefault()
+
+    horizontalScrollRemainder.current += deltaX
+    const horizontalSteps = Math.trunc(horizontalScrollRemainder.current / 24)
+    if (horizontalSteps) {
+      scrollPitchBy(horizontalSteps)
+      horizontalScrollRemainder.current -= horizontalSteps * 24
+    }
+
+    verticalScrollRemainder.current += deltaY
+    const verticalSteps = Math.trunc(verticalScrollRemainder.current / 24)
+    if (verticalSteps) {
+      scrollTimeBy(verticalSteps)
+      verticalScrollRemainder.current -= verticalSteps * 24
+    }
+  }
+
+  const handleMatrixTouchEnd = () => {
+    touchScrollRef.current = {
+      x: null,
+      y: null,
     }
   }
 
@@ -530,18 +608,28 @@ const Matrix = () => {
   useEffect(() => {
     const syncFullscreenState = () => {
       const nextIsFullscreen = document.fullscreenElement === rootRef.current
+      if (!isNativeFullscreenRef.current) return
       setIsFullscreen(nextIsFullscreen)
-      if (!nextIsFullscreen && viewportBeforeFullscreenRef.current) {
-        setShift(viewportBeforeFullscreenRef.current.shift)
-        setPagination(viewportBeforeFullscreenRef.current.pagination)
-        viewportBeforeFullscreenRef.current = null
-        pendingFullscreenViewportFitRef.current = false
+      if (!nextIsFullscreen) {
+        isNativeFullscreenRef.current = false
+        restoreViewportFromFullscreen()
       }
     }
     document.addEventListener('fullscreenchange', syncFullscreenState)
     syncFullscreenState()
     return () =>
       document.removeEventListener('fullscreenchange', syncFullscreenState)
+  }, [])
+
+  useEffect(() => {
+    const updateTouchDevice = () => {
+      setIsTouchDevice(
+        window.matchMedia('(hover: none), (pointer: coarse)').matches
+      )
+    }
+    updateTouchDevice()
+    window.addEventListener('resize', updateTouchDevice)
+    return () => window.removeEventListener('resize', updateTouchDevice)
   }, [])
 
   useEffect(() => {
@@ -630,6 +718,10 @@ const Matrix = () => {
           break
         case 'escape':
           setIsSongModalOpen(false)
+          if (isFullscreen && document.fullscreenElement !== rootRef.current) {
+            setIsFullscreen(false)
+            restoreViewportFromFullscreen()
+          }
           break
         // case 'enter':
         //   if (e.target.value.includes('sheet'))
@@ -674,7 +766,9 @@ const Matrix = () => {
   return (
     <div
       ref={rootRef}
-      className={`matrix-shell${isFullscreen ? ' matrix-shell-fullscreen' : ''}`}
+      className={`matrix-shell${isFullscreen ? ' matrix-shell-fullscreen' : ''}${
+        isTouchDevice ? ' matrix-shell-touch' : ''
+      }`}
     >
       {!isFullscreen && (
         <div className={`options  ${isSongModalOpen ? 'blured' : ''}`}>
@@ -806,6 +900,10 @@ const Matrix = () => {
       <div
         className={`matrix-viewport ${isSongModalOpen ? 'blured' : ''}${isFullscreen ? ' matrix-viewport-fullscreen' : ''}`}
         onWheel={handleMatrixWheel}
+        onTouchStart={handleMatrixTouchStart}
+        onTouchMove={handleMatrixTouchMove}
+        onTouchEnd={handleMatrixTouchEnd}
+        onTouchCancel={handleMatrixTouchEnd}
         style={{
           '--note-size': `${isFullscreen ? FULLSCREEN_NOTE_SIZE : DEFAULT_NOTE_SIZE}px`,
           '--shape-size': `${isFullscreen ? FULLSCREEN_SHAPE_SIZE : DEFAULT_SHAPE_SIZE}px`,
