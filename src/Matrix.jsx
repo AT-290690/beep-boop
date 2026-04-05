@@ -591,17 +591,20 @@ const Matrix = () => {
 
   useEffect(() => {
     const onGesture = () => {
+      void ensureAudioStarted().catch(() => {})
       void tryStartPendingSharedPlayback()
     }
 
     window.addEventListener('pointerdown', onGesture, { passive: true })
     window.addEventListener('keydown', onGesture)
     window.addEventListener('touchstart', onGesture, { passive: true })
+    window.addEventListener('click', onGesture, { passive: true })
 
     return () => {
       window.removeEventListener('pointerdown', onGesture)
       window.removeEventListener('keydown', onGesture)
       window.removeEventListener('touchstart', onGesture)
+      window.removeEventListener('click', onGesture)
     }
   }, [notes, offset, speed, pagination, synthPreset, pitchMap])
 

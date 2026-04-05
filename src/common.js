@@ -335,11 +335,21 @@ export const setSynthPreset = (presetId) => {
   return nextPreset
 }
 Tone.context.lookAhead = 0.2
-export const ensureAudioStarted = () => {
+export const ensureAudioStarted = async () => {
+  if (Tone.context.state === 'running') return
+
   if (!startAudioPromise) {
-    startAudioPromise = Tone.start()
+    startAudioPromise = Tone.start().catch((error) => {
+      startAudioPromise = null
+      throw error
+    })
   }
-  return startAudioPromise
+
+  await startAudioPromise
+
+  if (Tone.context.state !== 'running' && Tone.context.resume) {
+    await Tone.context.resume()
+  }
 }
 const NATURAL_NOTES = [
   'A0',
