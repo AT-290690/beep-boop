@@ -135,6 +135,8 @@ const Matrix = () => {
 
   const resize = useWindowSize({ initial: { w: width, h: mod }, isFullscreen })
   const rootRef = useRef(null)
+  const viewportBeforeFullscreenRef = useRef(null)
+  const pendingFullscreenViewportFitRef = useRef(false)
   const horizontalScrollRemainder = useRef(0)
   const verticalScrollRemainder = useRef(0)
   const playbackStartRef = useRef(0)
@@ -216,6 +218,11 @@ const Matrix = () => {
         await document.exitFullscreen()
         return
       }
+      viewportBeforeFullscreenRef.current = {
+        shift,
+        pagination,
+      }
+      pendingFullscreenViewportFitRef.current = true
       await rootRef.current?.requestFullscreen?.()
     } catch (_) {
       // Ignore fullscreen failures for now.
@@ -522,13 +529,63 @@ const Matrix = () => {
 
   useEffect(() => {
     const syncFullscreenState = () => {
-      setIsFullscreen(document.fullscreenElement === rootRef.current)
+      const nextIsFullscreen = document.fullscreenElement === rootRef.current
+      setIsFullscreen(nextIsFullscreen)
+      if (!nextIsFullscreen && viewportBeforeFullscreenRef.current) {
+        setShift(viewportBeforeFullscreenRef.current.shift)
+        setPagination(viewportBeforeFullscreenRef.current.pagination)
+        viewportBeforeFullscreenRef.current = null
+        pendingFullscreenViewportFitRef.current = false
+      }
     }
     document.addEventListener('fullscreenchange', syncFullscreenState)
     syncFullscreenState()
     return () =>
       document.removeEventListener('fullscreenchange', syncFullscreenState)
   }, [])
+
+  useEffect(() => {
+    if (!isFullscreen || !pendingFullscreenViewportFitRef.current || !notes.length)
+      return
+
+    const minX = notes.reduce(
+      (currentMin, note) => Math.min(currentMin, note.x),
+      notes[0].x
+    )
+    const maxX = notes.reduce(
+      (currentMax, note) => Math.max(currentMax, note.x),
+      notes[0].x
+    )
+    const minY = notes.reduce(
+      (currentMin, note) => Math.min(currentMin, note.y),
+      notes[0].y
+    )
+    const maxY = notes.reduce(
+      (currentMax, note) => Math.max(currentMax, note.y),
+      notes[0].y
+    )
+
+    const targetHorizontalCenter = (Math.max(1, width) - 1) / 2
+    const noteHorizontalCenter = (minY + maxY) / 2
+    const centeredShift = Math.round(targetHorizontalCenter - noteHorizontalCenter)
+
+    const songHeight = maxX - minX + 1
+    let centeredPagination = pagination
+    if (songHeight <= mod) {
+      centeredPagination = Math.round(minX - (mod - songHeight) / 2)
+    } else {
+      const minPagination = minX
+      const maxPagination = maxX - mod + 1
+      centeredPagination = Math.min(
+        Math.max(pagination, minPagination),
+        maxPagination
+      )
+    }
+
+    setShift(centeredShift)
+    setPagination(centeredPagination)
+    pendingFullscreenViewportFitRef.current = false
+  }, [isFullscreen, width, mod, notes, pagination])
 
   useEffect(() => {
     const onKeyDown = async (e) => {
